@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+# A sitemap is generated during production builds when SITE_URL is configured.

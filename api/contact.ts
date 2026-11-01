@@ -1,0 +1,307 @@
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { isIP } from "node:net";
+import { Resend } from "resend";
+import {
+  isValidEmail,
+  validateContactPayload,
+  type ContactInquiry,
+} from "../server/contact-validation.ts";
+
+type ApiRequest = IncomingMessage & {
+  body?: unknown;
+  ip?: string;
+};
+
+type ApiResponse = ServerResponse & {
+  statusCode: number;
+};
+
+type RateLimitResult = {
+  success: boolean;
+  reset: number;
+};
+
+type ContactHandlerDependencies = {
+  checkRateLimit: (ip: string) => Promise<RateLimitResult>;
+  sendEmail: (inquiry: ContactInquiry) => Promise<boolean>;
+};
+
+const maxBodyBytes = 12_000;
+
+function applySecurityHeaders(response: ApiResponse) {
+  response.setHeader("Cache-Control", "no-store");
+  response.setHeader("Content-Type", "application/json; charset=utf-8");
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  response.setHeader(
+    "Strict-Transport-Security",
+    "max-age=63072000; includeSubDomains; preload",
+  );
+}
+
+function sendJson(
+  response: ApiResponse,
+  status: number,
+  body: Record<string, unknown>,
+) {
+  response.statusCode = status;
+  response.end(JSON.stringify(body));
+}
+
+function requestIp(request: ApiRequest): string | undefined {
+  if (request.ip && isIP(request.ip)) {
+    return request.ip;
+  }
+  const forwarded = request.headers["x-vercel-forwarded-for"];
+  const fallback = request.headers["x-forwarded-for"];
+  const header = Array.isArray(forwarded)
+    ? forwarded[0]
+    : forwarded ?? (Array.isArray(fallback) ? fallback[0] : fallback);
+  const candidate = header?.split(",")[0]?.trim();
+  return candidate && isIP(candidate) ? candidate : undefined;
+}
+
+function hasSameOrigin(request: ApiRequest): boolean {
+  const origin = request.headers.origin;
+  if (!origin) return true;
+  const host = request.headers.host;
+  if (!host) return false;
+  try {
+    const parsedOrigin = new URL(origin);
+    return (
+      (parsedOrigin.protocol === "https:" || parsedOrigin.protocol === "http:") &&
+      parsedOrigin.host.toLowerCase() === host.toLowerCase()
+    );
+  } catch {
+    return false;
+  }
+}
+
+function parseBody(request: ApiRequest): unknown {
+  const body = request.body;
+  if (typeof body === "string") {
+    if (Buffer.byteLength(body, "utf8") > maxBodyBytes) return undefined;
+    try {
+      return JSON.parse(body) as unknown;
+    } catch {
+      return undefined;
+    }
+  }
+  if (Buffer.isBuffer(body)) {
+    if (body.byteLength > maxBodyBytes) return undefined;
+    try {
+      return JSON.parse(body.toString("utf8")) as unknown;
+    } catch {
+      return undefined;
+    }
+  }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return undefined;
+  }
+  try {
+    if (Buffer.byteLength(JSON.stringify(body), "utf8") > maxBodyBytes) {
+      return undefined;
+    }
+  } catch {
+    return undefined;
+  }
+  return body;
+}
+
+export function createContactHandler({
+  checkRateLimit,
+  sendEmail,
+}: ContactHandlerDependencies) {
+  return async function contactHandler(
+    request: ApiRequest,
+    response: ApiResponse,
+  ): Promise<void> {
+    applySecurityHeaders(response);
+
+    if (request.method !== "POST") {
+      response.setHeader("Allow", "POST");
+      sendJson(response, 405, { error: "Method not allowed." });
+      return;
+    }
+    if (!hasSameOrigin(request)) {
+      sendJson(response, 403, { error: "This request is not allowed." });
+      return;
+    }
+    const contentType = request.headers["content-type"]
+      ?.split(";")[0]
+      ?.trim()
+      .toLowerCase();
+    if (contentType !== "application/json") {
+      sendJson(response, 415, { error: "Submit the inquiry as JSON." });
+      return;
+    }
+
+    const contentLength = Number(request.headers["content-length"]);
+    if (Number.isFinite(contentLength) && contentLength > maxBodyBytes) {
+      sendJson(response, 413, { error: "The inquiry is too large." });
+      return;
+    }
+
+    const ip = requestIp(request);
+    if (!ip) {
+      sendJson(response, 503, { error: "The contact service is temporarily unavailable." });
+      return;
+    }
+
+    let limit: RateLimitResult;
+    try {
+      limit = await checkRateLimit(ip);
+    } catch (error) {
+      console.error(
+        "Contact rate-limit service failed:",
+        error instanceof Error ? error.message : "Unknown error",
+      );
+      sendJson(response, 503, { error: "The contact service is temporarily unavailable." });
+      return;
+    }
+    if (!limit.success) {
+      const retryAfter = Math.max(1, Math.ceil((limit.reset - Date.now()) / 1000));
+      response.setHeader("Retry-After", String(retryAfter));
+      sendJson(response, 429, { error: "Too many inquiries. Please try again later." });
+      return;
+    }
+
+    const body = parseBody(request);
+    if (body === undefined) {
+      sendJson(response, 400, { error: "Submit a valid inquiry under 12 KB." });
+      return;
+    }
+    const result = validateContactPayload(body);
+    if (!result.ok) {
+      sendJson(response, 400, { error: result.error });
+      return;
+    }
+    if (result.honeypotFilled) {
+      sendJson(response, 400, { error: "Check the inquiry details and try again." });
+      return;
+    }
+
+    try {
+      const accepted = await sendEmail(result.value);
+      if (!accepted) {
+        sendJson(response, 502, { error: "We could not submit your inquiry right now. Please try again later." });
+        return;
+      }
+    } catch (error) {
+      console.error(
+        "Contact email delivery failed:",
+        error instanceof Error ? error.message : "Unknown error",
+      );
+      sendJson(response, 502, { error: "We could not submit your inquiry right now. Please try again later." });
+      return;
+    }
+
+    sendJson(response, 200, { ok: true });
+  };
+}
+
+function requiredEnv(
+  env: NodeJS.ProcessEnv,
+  name: string,
+  errors: string[],
+): string {
+  const value = env[name]?.trim();
+  if (!value) {
+    errors.push(name);
+    return "";
+  }
+  return value;
+}
+
+function readRuntimeConfig(env: NodeJS.ProcessEnv) {
+  const errors: string[] = [];
+  const apiKey = requiredEnv(env, "RESEND_API_KEY", errors);
+  const recipient = requiredEnv(env, "CONTACT_TO_EMAIL", errors);
+  const sender = requiredEnv(env, "CONTACT_FROM_EMAIL", errors);
+  const redisUrl = requiredEnv(env, "UPSTASH_REDIS_REST_URL", errors);
+  const redisToken = requiredEnv(env, "UPSTASH_REDIS_REST_TOKEN", errors);
+
+  if (recipient && !isValidEmail(recipient)) errors.push("CONTACT_TO_EMAIL");
+  if (sender && !isValidEmail(sender)) errors.push("CONTACT_FROM_EMAIL");
+  if (redisUrl) {
+    try {
+      const url = new URL(redisUrl);
+      if (url.protocol !== "https:" || url.username || url.password) {
+        errors.push("UPSTASH_REDIS_REST_URL");
+      }
+    } catch {
+      errors.push("UPSTASH_REDIS_REST_URL");
+    }
+  }
+
+  if (errors.length > 0) {
+    return { ok: false as const, errors };
+  }
+  return {
+    ok: true as const,
+    apiKey,
+    recipient,
+    sender,
+    redisUrl,
+    redisToken,
+  };
+}
+
+export default async function handler(
+  request: ApiRequest,
+  response: ApiResponse,
+): Promise<void> {
+  const config = readRuntimeConfig(process.env);
+  if (!config.ok) {
+    applySecurityHeaders(response);
+    console.error("Contact service configuration is incomplete or invalid:", config.errors.join(", "));
+    sendJson(response, 503, { error: "The contact service is temporarily unavailable." });
+    return;
+  }
+
+  const redis = new Redis({
+    url: config.redisUrl,
+    token: config.redisToken,
+  });
+  const limiter = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(5, "15 m"),
+    prefix: "giemens:contact",
+  });
+  const resend = new Resend(config.apiKey);
+
+  const contactHandler = createContactHandler({
+    checkRateLimit: async (ip) => {
+      const result = await limiter.limit(ip);
+      return { success: result.success, reset: result.reset };
+    },
+    sendEmail: async (inquiry) => {
+      const result = await resend.emails.send({
+        from: config.sender,
+        to: [config.recipient],
+        replyTo: inquiry.email,
+        subject: `[GIEMENS] ${inquiry.subject}`,
+        text: [
+          `Name: ${inquiry.fullName}`,
+          `Email: ${inquiry.email}`,
+          `Phone: ${inquiry.phone ?? "Not provided"}`,
+          `Organization: ${inquiry.organization ?? "Not provided"}`,
+          `Category: ${inquiry.category}`,
+          "",
+          "Message:",
+          inquiry.message,
+        ].join("\n"),
+      });
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+      return Boolean(result.data?.id);
+    },
+  });
+
+  await contactHandler(request, response);
+}

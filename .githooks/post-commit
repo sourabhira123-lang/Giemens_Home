@@ -1,0 +1,4 @@
+#!/bin/sh
+
+branch=$(git symbolic-ref --quiet --short HEAD) || exit 0
+git push origin "$branch"

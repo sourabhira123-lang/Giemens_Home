@@ -1,0 +1,62 @@
+{
+  "/": {
+    "title": "GIEMENS | Building Trust. Connecting Solutions.",
+    "description": "A diversified, technology-driven enterprise connecting professional services, infrastructure, commerce and innovation."
+  },
+  "/about": {
+    "title": "About Us | GIEMENS",
+    "description": "Discover the vision, mission, purpose and values shaping the GIEMENS business ecosystem."
+  },
+  "/businesses": {
+    "title": "Our Businesses | GIEMENS",
+    "description": "Explore the business verticals across professional services, technology, commerce and infrastructure."
+  },
+  "/services": {
+    "title": "Services | GIEMENS",
+    "description": "Explore GIEMENS service capabilities across technology, compliance support, engineering and business advisory."
+  },
+  "/jurivana": {
+    "title": "Jurivana | Legal, Property & Compliance Support",
+    "description": "Explore Jurivana's documentation, property due diligence and business compliance support services."
+  },
+  "/technology": {
+    "title": "Technology & Innovation | GIEMENS",
+    "description": "Explore technology capabilities in software, AI, automation, SaaS, analytics and digital transformation."
+  },
+  "/ecommerce": {
+    "title": "E-Commerce & Consumer Products | GIEMENS",
+    "description": "Discover GIEMENS' digital commerce, consumer product and brand development ecosystem."
+  },
+  "/engineering": {
+    "title": "Engineering & Infrastructure | GIEMENS",
+    "description": "Engineering consultancy, project management and infrastructure support from GIEMENS."
+  },
+  "/marketing": {
+    "title": "Digital Marketing & Media | GIEMENS",
+    "description": "Digital marketing, media, content, brand strategy and campaign capabilities from GIEMENS."
+  },
+  "/consultancy": {
+    "title": "Business Consultancy | GIEMENS",
+    "description": "Strategic planning and business advisory for organizations navigating growth and change."
+  },
+  "/careers": {
+    "title": "Careers | GIEMENS",
+    "description": "Learn about the values and future opportunities at GIEMENS."
+  },
+  "/contact": {
+    "title": "Contact | GIEMENS",
+    "description": "Send an inquiry to the GIEMENS team through the contact form."
+  },
+  "/privacy-policy": {
+    "title": "Privacy Policy | GIEMENS",
+    "description": "How the GIEMENS website handles information submitted through its forms."
+  },
+  "/terms": {
+    "title": "Terms & Conditions | GIEMENS",
+    "description": "Terms for using the GIEMENS website and its informational content."
+  },
+  "/disclaimer": {
+    "title": "Disclaimer | GIEMENS",
+    "description": "Important information about GIEMENS website content and professional support."
+  }
+}
