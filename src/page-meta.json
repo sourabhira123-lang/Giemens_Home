@@ -16,28 +16,76 @@
     "description": "Explore GIEMENS service capabilities across technology, compliance support, engineering and business advisory."
   },
   "/jurivana": {
-    "title": "Jurivana | Legal, Property & Compliance Support",
-    "description": "Explore Jurivana's documentation, property due diligence and business compliance support services."
+    "title": "Jurivana | GIEMENS",
+    "description": "Legal, Property & Compliance solutions powered by Jurivana."
+  },
+  "/ecosystem/jurivana": {
+    "title": "Jurivana | GIEMENS",
+    "description": "Legal, Property & Compliance solutions powered by Jurivana."
   },
   "/technology": {
     "title": "Technology & Innovation | GIEMENS",
     "description": "Explore technology capabilities in software, AI, automation, SaaS, analytics and digital transformation."
   },
+  "/ecosystem/technology": {
+    "title": "Technology & Innovation | GIEMENS",
+    "description": "Explore GIEMENS technology capabilities in software, AI, automation and digital transformation."
+  },
+  "/ecosystem/commerce": {
+    "title": "E-Commerce & Consumer Products | GIEMENS",
+    "description": "Discover GIEMENS' digital commerce, consumer product and brand development ecosystem."
+  },
+  "/commerce": {
+    "title": "Commerce | GIEMENS",
+    "description": "Explore GIEMENS Commerce for e-commerce, marketplaces, digital marketing and brand growth."
+  },
+  "/ecosystem/academy": {
+    "title": "Academy | GIEMENS",
+    "description": "Explore professional learning and skills development across the GIEMENS ecosystem."
+  },
+  "/academy": {
+    "title": "Academy | GIEMENS",
+    "description": "Explore GIEMENS Academy professional training, corporate learning and skill development."
+  },
+  "/ecosystem/consulting": {
+    "title": "Business Consultancy | GIEMENS",
+    "description": "Strategic planning and business advisory for organizations navigating growth and change."
+  },
+  "/consulting": {
+    "title": "Consulting | GIEMENS",
+    "description": "Explore GIEMENS Consulting for startup advisory, strategy and organizational transformation."
+  },
   "/ecommerce": {
     "title": "E-Commerce & Consumer Products | GIEMENS",
     "description": "Discover GIEMENS' digital commerce, consumer product and brand development ecosystem."
+  },
+  "/ecosystem/ecommerce": {
+    "title": "E-Commerce & Consumer Products | GIEMENS",
+    "description": "Discover GIEMENS digital commerce and consumer product ecosystem."
   },
   "/engineering": {
     "title": "Engineering & Infrastructure | GIEMENS",
     "description": "Engineering consultancy, project management and infrastructure support from GIEMENS."
   },
+  "/ecosystem/engineering": {
+    "title": "Engineering & Infrastructure | GIEMENS",
+    "description": "Explore GIEMENS engineering consultancy and infrastructure delivery capability."
+  },
   "/marketing": {
     "title": "Digital Marketing & Media | GIEMENS",
     "description": "Digital marketing, media, content, brand strategy and campaign capabilities from GIEMENS."
   },
+  "/ecosystem/marketing": {
+    "title": "Digital Marketing & Media | GIEMENS",
+    "description": "GIEMENS digital marketing and media capabilities for modern brand growth."
+  },
   "/consultancy": {
     "title": "Business Consultancy | GIEMENS",
     "description": "Strategic planning and business advisory for organizations navigating growth and change."
+  },
+  "/ecosystem/consultancy": {
+    "title": "Business Consultancy | GIEMENS",
+    "description": "GIEMENS business consultancy for strategic planning and growth guidance."
   },
   "/careers": {
     "title": "Careers | GIEMENS",
@@ -46,6 +94,10 @@
   "/contact": {
     "title": "Contact | GIEMENS",
     "description": "Send an inquiry to the GIEMENS team through the contact form."
+  },
+  "/admin/leads": {
+    "title": "Lead Management | GIEMENS",
+    "description": "Review website inquiries captured in this browser."
   },
   "/privacy-policy": {
     "title": "Privacy Policy | GIEMENS",

@@ -8,6 +8,13 @@ Copy-Item .env.example .env
 npm run dev
 ```
 
+For the local CRM database, the existing PostgreSQL 18 instance is configured
+in pgAdmin at `127.0.0.1:5432`, with the existing `giemens` database and
+`postgres` login. Set `DATABASE_URL` in the ignored local `.env` file to that
+database, replacing `YOUR_LOCAL_PASSWORD` locally. Never commit `.env` or paste
+database credentials into chat. CRM migrations are scoped to the
+`giemens_crm` schema and must not modify the existing `public` schema.
+
 `npm run dev` starts the Vite website. To run the Vercel serverless contact
 function locally, copy `.env.example` to `.env.local`, add the required
 development credentials below, then run `npx vercel dev`. Opening the site with

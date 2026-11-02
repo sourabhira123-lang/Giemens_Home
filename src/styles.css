@@ -313,6 +313,7 @@ h1, h2, h3, .brand-name strong { font-family: "Manrope", sans-serif; }
 .business-section { background: linear-gradient(180deg, #E3EED4 0%, #edf2e5 46%, #E3EED4 100%); }
 .business-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .business-card-wrap { height: 100%; perspective: 900px; }
+.business-card-link { display: block; height: 100%; }
 .business-card {
   position: relative;
   min-height: 270px;
@@ -512,6 +513,33 @@ h1, h2, h3, .brand-name strong { font-family: "Manrope", sans-serif; }
 .spinner { width: 15px; height: 15px; border: 2px solid rgba(15,42,29,.25); border-top-color: var(--midnight-navy); border-radius: 50%; animation: spin .75s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Browser-local lead dashboard */
+.lead-dashboard { min-height: 60vh; background: var(--background-light); }
+.lead-storage-notice { margin: 0 0 28px; padding: 14px 17px; border: 1px solid var(--line-light); color: var(--muted-on-light); font-size: 11px; line-height: 1.7; }
+.lead-metrics { margin-bottom: 48px; }
+.lead-metrics .benefit-card { min-height: 140px; }
+.lead-metrics .benefit-number { font-size: 36px; }
+.lead-dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 34px; }
+.lead-panel-heading { margin: 0 0 16px; color: var(--midnight-navy); font-size: 19px; font-weight: 600; }
+.lead-list { border-top: 1px solid var(--line-light); }
+.lead-list-item { width: 100%; min-height: 72px; display: grid; grid-template-columns: minmax(0, 1fr) auto 18px; align-items: center; gap: 14px; padding: 13px 10px; border: 0; border-bottom: 1px solid var(--line-light); background: transparent; color: var(--deep-ocean); text-align: left; cursor: pointer; }
+.lead-list-item:hover, .lead-list-item-selected { background: rgba(174,195,176,.16); }
+.lead-list-item > span:first-child { min-width: 0; display: grid; gap: 5px; }
+.lead-list-item strong { overflow: hidden; color: var(--midnight-navy); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.lead-list-item small { color: var(--muted-on-light); font-size: 10px; }
+.lead-status-label { color: var(--corporate-blue); font-family: "DM Mono", monospace; font-size: 8px; }
+.lead-list-item svg { color: var(--ocean-teal); }
+.lead-details { padding: 18px; border: 1px solid var(--line-light); background: var(--background-light); }
+.lead-details dl { display: grid; gap: 12px; margin: 0; }
+.lead-details dl > div { display: grid; grid-template-columns: minmax(100px, .7fr) 1.3fr; gap: 12px; align-items: start; }
+.lead-details dt { color: var(--muted-on-light); font-family: "DM Mono", monospace; font-size: 9px; text-transform: uppercase; }
+.lead-details dd { min-width: 0; margin: 0; color: var(--deep-ocean); font-size: 11px; overflow-wrap: anywhere; }
+.lead-details dd a { color: var(--corporate-blue); text-decoration: underline; text-underline-offset: 2px; }
+.lead-details select { max-width: 100%; min-height: 34px; padding: 5px 8px; border: 1px solid var(--line-light); background: var(--background-light); color: var(--deep-ocean); font-size: 10px; }
+.lead-message { margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line-light); color: var(--deep-ocean); font-size: 11px; }
+.lead-message p { margin: 8px 0 0; color: var(--muted-on-light); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lead-empty { padding: 18px; border: 1px solid var(--line-light); color: var(--muted-on-light); font-size: 11px; }
+
 /* Legal */
 .legal-section { background: var(--background-light); }
 .legal-content { max-width: 900px; }
@@ -594,7 +622,7 @@ h1, h2, h3, .brand-name strong { font-family: "Manrope", sans-serif; }
   .hero-orbit { display: none; }
   .hero-bottom { bottom: 18px; font-size: 8px; }
   .hero-bottom span:nth-child(2) { display: none; }
-  .intro-layout, .technology-layout, .engineering-layout, .commerce-layout, .future-layout, .split-section, .values-grid, .detail-overview-grid, .careers-layout, .contact-layout { grid-template-columns: 1fr; gap: 38px; }
+  .intro-layout, .technology-layout, .engineering-layout, .commerce-layout, .future-layout, .split-section, .values-grid, .detail-overview-grid, .careers-layout, .contact-layout, .lead-dashboard-grid { grid-template-columns: 1fr; gap: 38px; }
   .intro-section { padding-block: 80px; }
   .intro-copy h2, .technology-copy h2, .engineering-copy h2, .commerce-layout h2, .future-intro h2, .split-section h2, .values-content h2, .careers-layout h2, .contact-intro h2, .detail-overview h2 { font-size: clamp(33px, 8vw, 44px); }
   .intro-visual { margin-right: 15px; }
@@ -665,6 +693,224 @@ h1, h2, h3, .brand-name strong { font-family: "Manrope", sans-serif; }
   .footer-column a { font-size: 9px; }
   .legal-item { grid-template-columns: 30px 1fr; gap: 11px; }
   .legal-item p { font-size: 12px; }
+}
+
+
+.breadcrumbs {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+  color: rgba(218, 230, 220, 0.78);
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.breadcrumb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.breadcrumb-item a {
+  color: rgba(218, 230, 220, 0.8);
+  text-decoration: none;
+}
+
+.breadcrumb-separator {
+  color: rgba(218, 230, 220, 0.54);
+}
+
+.jurivana-hero .page-hero-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-bottom: 62px;
+}
+
+.hero-tagline {
+  margin: 6px 0 12px;
+  color: var(--ice-cyan);
+  font-size: clamp(16px, 2vw, 22px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.jurivana-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.jurivana-hero-actions .button {
+  min-height: 48px;
+}
+
+.jurivana-service-grid .capability-item {
+  min-height: 220px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  align-content: start;
+}
+
+.jurivana-service-grid .capability-item > span {
+  font-size: 10px;
+}
+
+.jurivana-service-grid .capability-item strong {
+  margin: 0;
+}
+
+.jurivana-service-grid .capability-item p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.feature-grid,
+.benefit-grid,
+.future-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.feature-card,
+.benefit-card,
+.future-card {
+  min-height: 180px;
+  padding: 24px 20px;
+  border: 1px solid var(--line-dark);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.feature-card .feature-index,
+.benefit-card .benefit-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  border: 1px solid var(--line-dark);
+  color: var(--ice-cyan);
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.feature-card h3,
+.benefit-card h3 {
+  margin: 18px 0 12px;
+  font-size: 20px;
+}
+
+.feature-card p,
+.future-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.benefit-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.future-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.future-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.future-card-header strong {
+  color: var(--ice-cyan);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.future-card small {
+  display: block;
+  margin-top: 18px;
+  color: rgba(174, 195, 176, 0.78);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.jurivana-cta-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 32px 28px;
+  border: 1px solid var(--line-dark);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.jurivana-cta h2 {
+  margin: 12px 0 0;
+  font-size: clamp(28px, 3vw, 44px);
+  letter-spacing: -0.06em;
+}
+
+.jurivana-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (max-width: 980px) {
+  .feature-grid,
+  .benefit-grid,
+  .future-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .feature-grid,
+  .benefit-grid,
+  .future-grid,
+  .jurivana-cta-inner {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .jurivana-cta-inner {
+    padding: 24px 20px;
+  }
+
+  .jurivana-hero-actions,
+  .jurivana-cta-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .jurivana-hero-actions .button,
+  .jurivana-cta-actions .button {
+    width: 100%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

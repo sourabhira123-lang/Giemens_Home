@@ -1,0 +1,409 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["giemens_crm"]
+}
+
+enum BusinessUnit {
+  JURIVANA
+  TECHNOLOGY
+  ENGINEERING
+  COMMERCE
+  CONSULTING
+  ACADEMY
+  CORPORATE
+
+  @@schema("giemens_crm")
+}
+
+enum LeadStatus {
+  NEW
+  QUALIFIED
+  CONTACTED
+  IN_PROGRESS
+  CONVERTED
+  DISQUALIFIED
+
+  @@schema("giemens_crm")
+}
+
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+
+  @@schema("giemens_crm")
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  CANCELLED
+
+  @@schema("giemens_crm")
+}
+
+enum DocumentStatus {
+  PENDING_SCAN
+  AVAILABLE
+  QUARANTINED
+  ARCHIVED
+
+  @@schema("giemens_crm")
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+
+  @@schema("giemens_crm")
+}
+
+enum AgentRunStatus {
+  QUEUED
+  RUNNING
+  NEEDS_APPROVAL
+  SUCCEEDED
+  FAILED
+  CANCELLED
+
+  @@schema("giemens_crm")
+}
+
+model User {
+  id           String                   @id @default(uuid()) @db.Uuid
+  entraSubject String                   @unique @map("entra_subject") @db.VarChar(255)
+  email        String                   @db.VarChar(320)
+  displayName  String                   @map("display_name") @db.VarChar(200)
+  createdAt    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime?                @map("deleted_at") @db.Timestamptz(6)
+  memberships  OrganizationMembership[]
+
+  @@index([email])
+  @@map("users")
+  @@schema("giemens_crm")
+}
+
+model Role {
+  id           String                   @id @default(uuid()) @db.Uuid
+  organizationId String?                @map("organization_id") @db.Uuid
+  name         String                   @db.VarChar(100)
+  description  String?                  @db.VarChar(500)
+  isSystem     Boolean                  @default(false) @map("is_system")
+  createdAt    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime?                @map("deleted_at") @db.Timestamptz(6)
+  organization Organization?            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  permissions RolePermission[]
+  memberships  OrganizationMembership[]
+
+  @@unique([organizationId, name])
+  @@map("roles")
+  @@schema("giemens_crm")
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique @db.VarChar(160)
+  description String?          @db.VarChar(500)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  roles       RolePermission[]
+
+  @@map("permissions")
+  @@schema("giemens_crm")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+  @@schema("giemens_crm")
+}
+
+model Organization {
+  id          String                   @id @default(uuid()) @db.Uuid
+  name        String                   @db.VarChar(200)
+  slug        String                   @unique @db.VarChar(100)
+  createdAt   DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime?                @map("deleted_at") @db.Timestamptz(6)
+  memberships OrganizationMembership[]
+  roles       Role[]
+  leads       Lead[]
+  contacts    Contact[]
+  customers   Customer[]
+  projects    Project[]
+  tasks       Task[]
+  documents   Document[]
+  activities  Activity[]
+  notifications Notification[]
+  agentLogs   AgentLog[]
+  auditLogs   AuditLog[]
+  outboxEvents OutboxEvent[]
+
+  @@map("organizations")
+  @@schema("giemens_crm")
+}
+
+model OrganizationMembership {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  roleId         String       @map("role_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role           Role         @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_memberships")
+  @@schema("giemens_crm")
+}
+
+model Lead {
+  id               String       @id @default(uuid()) @db.Uuid
+  organizationId   String       @map("organization_id") @db.Uuid
+  businessUnit     BusinessUnit @map("business_unit")
+  status           LeadStatus   @default(NEW)
+  source           String?      @db.VarChar(100)
+  fullName         String       @map("full_name") @db.VarChar(200)
+  email            String?      @db.VarChar(320)
+  phone            String?      @db.VarChar(40)
+  companyName      String?      @map("company_name") @db.VarChar(200)
+  inquiry          String       @db.Text
+  assignedUserId   String?      @map("assigned_user_id") @db.Uuid
+  classification   Json?
+  consentAt        DateTime?    @map("consent_at") @db.Timestamptz(6)
+  convertedAt     DateTime?    @map("converted_at") @db.Timestamptz(6)
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, businessUnit, status, createdAt])
+  @@index([organizationId, assignedUserId, status])
+  @@map("leads")
+  @@schema("giemens_crm")
+}
+
+model Contact {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  customerId     String?      @map("customer_id") @db.Uuid
+  fullName       String       @map("full_name") @db.VarChar(200)
+  email          String?      @db.VarChar(320)
+  phone          String?      @db.VarChar(40)
+  title          String?      @db.VarChar(120)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, email])
+  @@map("contacts")
+  @@schema("giemens_crm")
+}
+
+model Customer {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  businessUnit   BusinessUnit @map("business_unit")
+  name           String       @db.VarChar(200)
+  email          String?      @db.VarChar(320)
+  phone          String?      @db.VarChar(40)
+  sourceLeadId   String?      @map("source_lead_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  projects       Project[]
+
+  @@index([organizationId, businessUnit, name])
+  @@map("customers")
+  @@schema("giemens_crm")
+}
+
+model Project {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  customerId     String?       @map("customer_id") @db.Uuid
+  businessUnit   BusinessUnit  @map("business_unit")
+  name           String        @db.VarChar(200)
+  description    String?       @db.Text
+  status         ProjectStatus @default(PLANNED)
+  startAt        DateTime?     @map("start_at") @db.Timestamptz(6)
+  dueAt          DateTime?     @map("due_at") @db.Timestamptz(6)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer       Customer?     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  tasks          Task[]
+
+  @@index([organizationId, businessUnit, status])
+  @@map("projects")
+  @@schema("giemens_crm")
+}
+
+model Task {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  projectId      String?      @map("project_id") @db.Uuid
+  title          String       @db.VarChar(240)
+  description    String?      @db.Text
+  status         TaskStatus   @default(OPEN)
+  assignedUserId String?      @map("assigned_user_id") @db.Uuid
+  dueAt          DateTime?    @map("due_at") @db.Timestamptz(6)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status, dueAt])
+  @@map("tasks")
+  @@schema("giemens_crm")
+}
+
+model Document {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  businessUnit   BusinessUnit   @map("business_unit")
+  ownerUserId    String?        @map("owner_user_id") @db.Uuid
+  storageKey     String         @map("storage_key") @db.VarChar(500)
+  fileName       String         @map("file_name") @db.VarChar(255)
+  contentType    String         @map("content_type") @db.VarChar(150)
+  sizeBytes      BigInt         @map("size_bytes")
+  sha256         String         @db.Char(64)
+  status         DocumentStatus @default(PENDING_SCAN)
+  classification String?        @db.VarChar(100)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?      @map("deleted_at") @db.Timestamptz(6)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, storageKey])
+  @@index([organizationId, businessUnit, status])
+  @@map("documents")
+  @@schema("giemens_crm")
+}
+
+model Activity {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  actorUserId    String?      @map("actor_user_id") @db.Uuid
+  action         String       @db.VarChar(120)
+  subjectType    String       @map("subject_type") @db.VarChar(80)
+  subjectId      String       @map("subject_id") @db.Uuid
+  details        Json?
+  correlationId  String?      @map("correlation_id") @db.VarChar(100)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, subjectType, subjectId, createdAt])
+  @@index([organizationId, actorUserId, createdAt])
+  @@map("activities")
+  @@schema("giemens_crm")
+}
+
+model Notification {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  recipientUserId String?           @map("recipient_user_id") @db.Uuid
+  channel        String             @db.VarChar(40)
+  templateKey    String             @map("template_key") @db.VarChar(120)
+  status         NotificationStatus @default(PENDING)
+  payload        Json
+  scheduledAt    DateTime?          @map("scheduled_at") @db.Timestamptz(6)
+  sentAt         DateTime?          @map("sent_at") @db.Timestamptz(6)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?          @map("deleted_at") @db.Timestamptz(6)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status, scheduledAt])
+  @@map("notifications")
+  @@schema("giemens_crm")
+}
+
+model AgentLog {
+  id                String        @id @default(uuid()) @db.Uuid
+  organizationId    String        @map("organization_id") @db.Uuid
+  agentKey          String        @map("agent_key") @db.VarChar(120)
+  runStatus         AgentRunStatus @default(QUEUED) @map("run_status")
+  modelDeployment   String?       @map("model_deployment") @db.VarChar(120)
+  policyVersion     String?       @map("policy_version") @db.VarChar(80)
+  inputReference    String?       @map("input_reference") @db.VarChar(200)
+  outputSummary     Json?         @map("output_summary")
+  approvalRequired  Boolean       @default(false) @map("approval_required")
+  approvedByUserId  String?       @map("approved_by_user_id") @db.Uuid
+  tokenCount        Int?          @map("token_count")
+  durationMs        Int?          @map("duration_ms")
+  errorCode         String?       @map("error_code") @db.VarChar(100)
+  correlationId     String?       @map("correlation_id") @db.VarChar(100)
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt       DateTime?     @map("completed_at") @db.Timestamptz(6)
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, agentKey, createdAt])
+  @@index([organizationId, runStatus, createdAt])
+  @@map("agent_logs")
+  @@schema("giemens_crm")
+}
+
+model AuditLog {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  actorUserId    String?      @map("actor_user_id") @db.Uuid
+  action         String       @db.VarChar(120)
+  resourceType   String       @map("resource_type") @db.VarChar(80)
+  resourceId     String?      @map("resource_id") @db.Uuid
+  beforeState    Json?        @map("before_state")
+  afterState     Json?        @map("after_state")
+  source         String       @db.VarChar(80)
+  correlationId  String?      @map("correlation_id") @db.VarChar(100)
+  occurredAt     DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, resourceType, resourceId, occurredAt])
+  @@index([organizationId, actorUserId, occurredAt])
+  @@map("audit_logs")
+  @@schema("giemens_crm")
+}
+
+model OutboxEvent {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  eventType      String       @map("event_type") @db.VarChar(160)
+  aggregateType  String       @map("aggregate_type") @db.VarChar(100)
+  aggregateId    String       @map("aggregate_id") @db.Uuid
+  payload        Json
+  occurredAt     DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  publishedAt    DateTime?    @map("published_at") @db.Timestamptz(6)
+  attempts       Int          @default(0)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([publishedAt, occurredAt])
+  @@index([organizationId, aggregateType, aggregateId])
+  @@map("outbox_events")
+  @@schema("giemens_crm")
+}

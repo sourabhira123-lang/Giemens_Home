@@ -12,8 +12,8 @@ import {
   Target,
   Workflow,
 } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useRef, useState, type FormEvent } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   businessAreas,
   companyName,
@@ -22,12 +22,24 @@ import {
   pageMeta,
 } from "./data";
 import {
+  Breadcrumbs,
   BusinessCard,
   CTASection,
   PageMeta,
   Reveal,
   SectionHeading,
 } from "./components";
+import {
+  jurivanaAiFeatures,
+  jurivanaBenefits,
+  jurivanaServices,
+} from "./services/ecosystem";
+import { futureAiServices } from "./services/future-ai";
+import {
+  getBusinessDivision,
+  getCategoryForDivision,
+  resolveBusinessDivision,
+} from "./features/leads/leadManagement";
 
 const architectureImage =
   "https://images.unsplash.com/photo-1487958449943-2429e8be8625?auto=format&fit=crop&w=1500&q=85";
@@ -44,18 +56,29 @@ function PageHero({
   description,
   image = cityImage,
   imageAlt = "Contemporary architecture against a deep blue sky",
+  breadcrumbLabel,
 }: {
   eyebrow: string;
   title: string;
   description: string;
   image?: string;
   imageAlt?: string;
+  breadcrumbLabel?: string;
 }) {
   return (
     <section className="page-hero">
       <img className="page-hero-image" src={image} alt={imageAlt} fetchPriority="high" />
       <div className="page-hero-overlay" />
       <div className="container page-hero-content">
+        {breadcrumbLabel && (
+          <Breadcrumbs
+            items={[
+              { label: "Home", to: "/" },
+              { label: "Business ecosystem", to: "/businesses" },
+              { label: breadcrumbLabel },
+            ]}
+          />
+        )}
         <Reveal>
           <span className="eyebrow">{eyebrow}</span>
           <h1>{title}</h1>
@@ -488,18 +511,18 @@ export function BusinessesPage() {
 }
 
 const serviceDetails = [
-  { title: "Legal, property & compliance support", detail: "Documentation assistance, property verification and due diligence, business registration guidance, and licensing and compliance support.", path: "/jurivana" },
-  { title: "Technology & digital solutions", detail: "Software development, technology consulting, digital transformation, automation and data-informed solutions.", path: "/technology" },
-  { title: "Engineering & infrastructure", detail: "Engineering consultancy, project coordination and infrastructure support tailored to project context.", path: "/engineering" },
-  { title: "Digital marketing & media", detail: "Brand strategy, content, search and social media marketing, creative production and campaign planning.", path: "/marketing" },
-  { title: "E-commerce & consumer products", detail: "Digital commerce strategy, marketplace enablement, product positioning and brand development.", path: "/ecommerce" },
-  { title: "Business consultancy", detail: "Strategic planning, business advisory, operational thinking and management consultancy.", path: "/consultancy" },
+  { title: "Legal, property & compliance support", detail: "Documentation assistance, property verification and due diligence, business registration guidance, and licensing and compliance support.", path: "/ecosystem/jurivana" },
+  { title: "Technology & digital solutions", detail: "Software development, technology consulting, digital transformation, automation and data-informed solutions.", path: "/ecosystem/technology" },
+  { title: "Engineering & infrastructure", detail: "Engineering consultancy, project coordination and infrastructure support tailored to project context.", path: "/ecosystem/engineering" },
+  { title: "Digital marketing & media", detail: "Brand strategy, content, search and social media marketing, creative production and campaign planning.", path: "/ecosystem/marketing" },
+  { title: "E-commerce & consumer products", detail: "Digital commerce strategy, marketplace enablement, product positioning and brand development.", path: "/ecosystem/ecommerce" },
+  { title: "Business consultancy", detail: "Strategic planning, business advisory, operational thinking and management consultancy.", path: "/ecosystem/consultancy" },
 ];
 
-export function ServicesPage() {
+export function ServicesPage({ path = "/services" }: { path?: string }) {
   return (
     <>
-      <PageMeta {...pageMeta["/services"]} />
+      <PageMeta {...pageMeta[path]} />
       <PageHero
         eyebrow="What we do"
         title="Practical support for ambitious ideas."
@@ -561,6 +584,15 @@ const detailedPages: Record<string, {
     overview: "We bring together digital commerce, product thinking and brand development across B2B, B2C and D2C opportunities. Consumer product areas include fragrances, cosmetics, skincare and private label.",
     capabilities: ["Digital commerce", "B2B, B2C & D2C", "Marketplace & distribution", "Fragrances & cosmetics", "Private-label products", "Brand development"],
   },
+  "/commerce": {
+    eyebrow: "GIEMENS Commerce",
+    title: "Building connected commerce experiences.",
+    description: "A connected division for e-commerce solutions, marketplace platforms, digital marketing and sustainable brand growth.",
+    image: workspaceImage,
+    imageAlt: "Modern design studio and collaborative workspace",
+    overview: "GIEMENS Commerce brings digital channels, marketplace thinking and brand development together to help businesses reach customers and grow with clarity.",
+    capabilities: ["E-commerce solutions", "Marketplace platforms", "Digital marketing", "Brand strategy", "Customer growth", "Commerce operations"],
+  },
   "/engineering": {
     eyebrow: "Engineering & infrastructure",
     title: "Engineering vision into execution.",
@@ -588,12 +620,40 @@ const detailedPages: Record<string, {
     overview: "Good advice starts with listening. We work to understand the situation, clarify priorities and shape a practical path forward—grounded in the needs and capacity of each organization.",
     capabilities: ["Strategic planning", "Business advisory", "Management consultancy", "Growth and operating models", "Process improvement", "Business research"],
   },
+  "/consulting": {
+    eyebrow: "GIEMENS Consulting",
+    title: "Clearer thinking for what comes next.",
+    description: "Practical consulting for startups and organizations navigating strategy, process improvement and transformation.",
+    image: architectureImage,
+    imageAlt: "Modern building with a confident geometric form",
+    overview: "GIEMENS Consulting works with organizations to clarify priorities, improve the way work gets done and build a practical path toward meaningful change.",
+    capabilities: ["Startup advisory", "Business process consulting", "Strategy consulting", "Organizational transformation", "Operating models", "Growth planning"],
+  },
+  "/academy": {
+    eyebrow: "GIEMENS Academy",
+    title: "Learning for a changing world.",
+    description: "Professional training and skills development to help people and organizations grow with confidence.",
+    image: workspaceImage,
+    imageAlt: "Collaborative workspace for learning and professional development",
+    overview: "GIEMENS Academy connects practical learning with evolving professional needs, supporting individuals and organizations as they build new capabilities.",
+    capabilities: ["Professional training", "Corporate learning", "Skill development", "Certification programs", "Digital learning", "Career development"],
+  },
 };
 
 export function DetailPage({ path }: { path: string }) {
   const content = detailedPages[path];
   if (!content) return null;
   const meta = pageMeta[path];
+  const inquiryDivision =
+    path === "/technology" ? "Technology" :
+    path === "/engineering" ? "Engineering" :
+    path === "/commerce" || path === "/ecommerce" ? "Commerce" :
+    path === "/consulting" || path === "/consultancy" ? "Consulting" :
+    path === "/academy" ? "Academy" :
+    undefined;
+  const inquirySource = inquiryDivision
+    ? `${inquiryDivision.toLowerCase()}_inquiry`
+    : undefined;
   return (
     <>
       <PageMeta {...meta} />
@@ -603,6 +663,14 @@ export function DetailPage({ path }: { path: string }) {
         description={content.description}
         image={content.image}
         imageAlt={content.imageAlt}
+        breadcrumbLabel={
+          path === "/technology" ? "Technology" :
+          path === "/engineering" ? "Engineering" :
+          path === "/commerce" ? "Commerce" :
+          path === "/consulting" ? "Consulting" :
+          path === "/academy" ? "Academy" :
+          undefined
+        }
       />
       <section className="section detail-overview">
         <div className="container detail-overview-grid">
@@ -634,79 +702,168 @@ export function DetailPage({ path }: { path: string }) {
           {content.note && <p className="capability-note">{content.note}</p>}
         </div>
       </section>
-      <CTASection secondaryPath="/businesses" />
+      <CTASection
+        secondaryPath="/businesses"
+        contactPath={
+          inquiryDivision && inquirySource
+            ? `/contact?division=${encodeURIComponent(inquiryDivision)}&source=${encodeURIComponent(inquirySource)}`
+            : "/contact"
+        }
+      />
     </>
   );
 }
 
 export function JurivanaPage() {
-  const services = [
-    "Legal documentation support",
-    "Property verification",
-    "Property due diligence",
-    "Property documentation",
-    "Business registration assistance",
-    "Licensing and certification support",
-    "Corporate compliance support",
-    "Regulatory process assistance",
-  ];
   return (
     <>
-      <PageMeta {...pageMeta["/jurivana"]} />
-      <PageHero
-        eyebrow="A GIEMENS specialized brand"
-        title="Simplifying legal. Securing property. Empowering business."
-        description="Jurivana helps people and organizations navigate documentation, property due diligence and business compliance processes with greater clarity."
-        image="https://images.unsplash.com/photo-1505664194779-8beaceb93744?auto=format&fit=crop&w=1600&q=85"
-        imageAlt="Formal architectural columns in a civic building"
-      />
-      <section className="section jurivana-intro">
+      <PageMeta {...(pageMeta["/ecosystem/jurivana"] ?? pageMeta["/jurivana"])} />
+      <section className="page-hero jurivana-hero">
+        <img
+          className="page-hero-image"
+          src="https://images.unsplash.com/photo-1505664194779-8beaceb93744?auto=format&fit=crop&w=1600&q=85"
+          alt="Formal architectural columns in a civic building"
+          fetchPriority="high"
+        />
+        <div className="page-hero-overlay" />
+        <div className="container page-hero-content">
+          <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Business ecosystem", to: "/businesses" }, { label: "Jurivana" }]} />
+          <Reveal>
+            <span className="eyebrow">GIEMENS specialized brand</span>
+            <h1>Jurivana</h1>
+            <p className="hero-tagline">Legal. Property. Compliance.</p>
+            <p>
+              Integrated legal, compliance, property verification and business support platform powered by technology and intelligent automation.
+            </p>
+          </Reveal>
+          <div className="jurivana-hero-actions">
+            <Link className="button button-primary" to="/contact?division=Jurivana&source=jurivana_inquiry">Get Started <ArrowRight size={17} /></Link>
+            <Link className="button button-ghost" to="/contact?division=Jurivana&source=consultation_request">Book Consultation <ArrowDownRight size={17} /></Link>
+            <Link className="button button-ghost" to="#jurivana-services">Learn More</Link>
+          </div>
+        </div>
+        <span className="page-hero-index" aria-hidden="true">GIEMENS / JURIVANA</span>
+      </section>
+
+      <section className="section jurivana-intro" id="jurivana-services">
         <div className="container detail-overview-grid">
           <Reveal>
-            <span className="eyebrow">Clarity for complex processes</span>
-            <h2>Support to help you take the next step.</h2>
+            <span className="eyebrow">Jurivana support</span>
+            <h2>Legal confidence,<br /><span>property clarity.</span></h2>
           </Reveal>
           <Reveal delay={0.1}>
             <p className="lead">
-              Jurivana is a specialized brand within the GIEMENS ecosystem,
-              focused on making legal-adjacent, property and compliance
-              processes easier to understand and navigate.
+              Jurivana brings legal, compliance, documentation and property support into one connected experience to help businesses and individuals move forward with more confidence.
             </p>
             <p>
-              Assistance is administrative and informational in nature unless
-              otherwise stated. For legal opinions, representation or regulated
-              professional advice, consult a qualified and authorized
-              professional.
+              The platform is designed to simplify administrative workflows, increase visibility and provide a more organized path from inquiry to action. Qualified legal and specialist advice remains subject to the relevant professional and jurisdictional requirements.
             </p>
           </Reveal>
         </div>
       </section>
+
       <section className="capabilities-section">
         <div className="container">
           <SectionHeading
-            eyebrow="Jurivana support"
-            title="Practical assistance, with clarity at every step."
-            description="A focused set of support areas for individuals and organizations managing essential documentation and compliance processes."
+            eyebrow="Services"
+            title="Support across the full legal and compliance journey."
+            description="A structured set of business support services covering essential documentation, property diligence and compliance continuity."
             light
           />
-          <div className="capability-grid">
-            {services.map((service, index) => (
-              <Reveal className="capability-item" key={service} delay={(index % 4) * 0.04}>
-                <span>0{index + 1}</span><strong>{service}</strong><ArrowUpRight size={16} />
+          <div className="capability-grid jurivana-service-grid">
+            {jurivanaServices.map((service, index) => (
+              <Reveal className="capability-item" key={service.title} delay={(index % 4) * 0.04}>
+                <span>0{index + 1}</span>
+                <strong>{service.title}</strong>
+                <p>{service.description}</p>
+                <ArrowUpRight size={16} />
               </Reveal>
             ))}
           </div>
-          <div className="jurivana-disclaimer">
-            <ShieldCheck size={20} />
-            <p>
-              <strong>Important:</strong> Jurivana is not represented here as a
-              law firm and does not claim to provide legal representation.
-              Service scope and availability depend on the specific matter.
-            </p>
+        </div>
+      </section>
+
+      <section className="section jurivana-ai-section">
+        <div className="container">
+          <SectionHeading
+            eyebrow="AI powered features"
+            title="Intelligence built into the workflow."
+            description="A practical layer of automation designed to reduce friction, improve visibility and support faster decision-making."
+            align="center"
+          />
+          <div className="feature-grid">
+            {jurivanaAiFeatures.map((feature, index) => (
+              <Reveal className="feature-card" key={feature.title} delay={(index % 3) * 0.04}>
+                <span className="feature-index">0{index + 1}</span>
+                <h3>{feature.title}</h3>
+                <p>{feature.description}</p>
+              </Reveal>
+            ))}
           </div>
         </div>
       </section>
-      <CTASection title="Need help navigating a process?" description="Tell us what you are working through. Our team can help identify the right next conversation." secondaryPath="/services" />
+
+      <section className="section jurivana-benefits">
+        <div className="container">
+          <SectionHeading
+            eyebrow="Why Jurivana"
+            title="Designed for clarity, speed and confidence."
+            description="Practical tools and support layers that help teams handle important processes without losing visibility or momentum."
+          />
+          <div className="benefit-grid">
+            {jurivanaBenefits.map((benefit, index) => (
+              <Reveal className="benefit-card" key={benefit} delay={(index % 3) * 0.04}>
+                <span className="benefit-number">0{index + 1}</span>
+                <h3>{benefit}</h3>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section future-ecosystem-section">
+        <div className="container">
+          <SectionHeading
+            eyebrow="Future-ready ecosystem"
+            title="Built for the next phase of connected operations."
+            description="The platform is prepared for future integrations with CRM, ERP, AI receptionist, proposal generation and executive reporting layers."
+            align="center"
+          />
+          <div className="future-grid">
+            {futureAiServices.map((service, index) => (
+              <Reveal className="future-card" key={service.name} delay={(index % 4) * 0.04}>
+                <div className="future-card-header">
+                  <span>{service.name}</span>
+                  <strong>{service.status}</strong>
+                </div>
+                <p>{service.purpose}</p>
+                <small>{service.endpoint}</small>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section jurivana-cta">
+        <div className="container jurivana-cta-inner">
+          <div>
+            <span className="eyebrow">Need legal or compliance support?</span>
+            <h2>Start Your Jurivana Journey</h2>
+          </div>
+          <div className="jurivana-cta-actions">
+            <Link className="button button-primary" to="/contact?division=Jurivana&source=jurivana_inquiry">Get Started</Link>
+            <Link className="button button-ghost" to="/businesses">Explore ecosystem</Link>
+          </div>
+        </div>
+      </section>
+
+      <div className="jurivana-disclaimer container">
+        <ShieldCheck size={20} />
+        <p>
+          <strong>Important:</strong> Jurivana is not represented here as a law firm and does not claim to provide legal representation. Service scope and availability depend on the specific matter and applicable professional guidance.
+        </p>
+      </div>
+      <CTASection title="Need help navigating a process?" description="Tell us what you are working through. Our team can help identify the right next conversation." secondaryPath="/services" contactPath="/contact?division=Jurivana&source=jurivana_inquiry" />
     </>
   );
 }
@@ -755,8 +912,8 @@ const legalContent: Record<string, { heading: string; lead: string; sections: { 
     heading: "Privacy policy",
     lead: "This notice explains how this website is designed to handle information you choose to provide. It should be reviewed and completed for the applicable jurisdiction and actual operating practices before publication.",
     sections: [
-      { title: "Information you provide", text: "The contact form requests your name, email address, optional phone number and organization, inquiry category, subject and message. The form does not transmit submissions until a contact endpoint is configured. When connected, the receiving organization and its service providers may process the information to respond to your inquiry." },
-      { title: "Purpose and retention", text: "Information submitted through an enabled contact channel should be used to address the inquiry and retained only as long as needed for that purpose or as required by applicable obligations. Retention periods and the responsible data controller should be confirmed before the form is activated." },
+      { title: "Information you provide", text: "The contact form requests your name, email address, optional phone number and organization, inquiry category, subject and message. Submissions are stored in GIEMENS' centralized lead database and are also sent to the configured contact endpoint for delivery. Lead records are not accessible through the website dashboard until administrator authentication is configured." },
+      { title: "Purpose and retention", text: "Information submitted through the contact form is used to respond to your inquiry and support lead management. Contact endpoint processing and retention are subject to the receiving organization and its service providers. Do not include sensitive personal information in a message." },
       { title: "Cookies and third parties", text: "This website does not intentionally set analytics or advertising cookies. Some visual assets are loaded from third-party image hosting and may result in a request to that provider. Review and update this statement if analytics, embedded services or additional tracking are introduced." },
       { title: "Your choices and questions", text: "For requests concerning information submitted through an enabled contact channel, use the same channel through which you made the inquiry. A verified privacy contact address has not been provided on this website." },
     ],
@@ -855,6 +1012,16 @@ export function ContactPage() {
 function ContactForm() {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [searchParams] = useSearchParams();
+  const requestedDivision = resolveBusinessDivision(searchParams.get("division"));
+  const initialCategory = requestedDivision
+    ? getCategoryForDivision(requestedDivision)
+    : "";
+  const [category, setCategory] = useState(initialCategory);
+  const [businessDivision, setBusinessDivision] = useState(
+    getBusinessDivision(initialCategory, requestedDivision),
+  );
+  const submissionId = useRef<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -877,9 +1044,48 @@ function ContactForm() {
       return;
     }
 
+    const inquiryCategory = String(data.get("category") ?? "");
+    const division =
+      resolveBusinessDivision(String(data.get("businessDivision") ?? "")) ??
+      getBusinessDivision(inquiryCategory, requestedDivision);
+    const inquirySource = searchParams.get("source") || "website_contact_form";
+    submissionId.current ??= crypto.randomUUID();
+
     const endpoint = import.meta.env.VITE_CONTACT_ENDPOINT || "/api/contact";
     setStatus("loading");
     try {
+      const leadResponse = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: submissionId.current,
+          name: data.get("fullName"),
+          email: data.get("email"),
+          phone: normalizedPhone || undefined,
+          company: data.get("organization"),
+          businessDivision: division,
+          message: data.get("message"),
+          source: inquirySource,
+          subject: data.get("subject"),
+          category: inquiryCategory,
+          website: data.get("website"),
+        }),
+      });
+      const leadResult: unknown = await leadResponse.json().catch(() => undefined);
+      const leadBody =
+        typeof leadResult === "object" && leadResult !== null
+          ? (leadResult as { ok?: unknown; error?: unknown })
+          : undefined;
+      if (leadResponse.status !== 201 || leadBody?.ok !== true) {
+        setStatus("error");
+        setMessage(
+          typeof leadBody?.error === "string"
+            ? leadBody.error
+            : "Your inquiry could not be saved. Please try again later.",
+        );
+        return;
+      }
+
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -888,7 +1094,7 @@ function ContactForm() {
           email: data.get("email"),
           phone: normalizedPhone || undefined,
           organization: data.get("organization"),
-          category: data.get("category"),
+          category: inquiryCategory,
           subject: data.get("subject"),
           message: data.get("message"),
           website: data.get("website"),
@@ -903,7 +1109,7 @@ function ContactForm() {
         });
         setStatus("error");
         setMessage(
-          "The contact service is unavailable in this preview. For local testing, start the app with `npx vercel dev` and configure the required email and rate-limit environment variables.",
+          "Your inquiry was saved, but could not be delivered. Please try again later.",
         );
         return;
       }
@@ -920,18 +1126,23 @@ function ContactForm() {
       if (response.status !== 200 || responseBody?.ok !== true) {
         setStatus("error");
         setMessage(
-          (typeof responseBody?.error === "string" && responseBody.error) ||
+          (typeof responseBody?.error === "string" && responseBody.error
+            ? `${responseBody.error} Your inquiry is saved.`
+            : undefined) ||
             "We could not submit your inquiry right now. Please try again later.",
         );
         return;
       }
       form.reset();
+      submissionId.current = null;
+      setCategory(initialCategory);
+      setBusinessDivision(getBusinessDivision(initialCategory, requestedDivision));
       setStatus("success");
       setMessage("Your inquiry has been submitted. Thank you for getting in touch.");
     } catch (error) {
       console.error("Contact form submission failed:", error);
       setStatus("error");
-      setMessage("We could not submit your inquiry right now. Please try again later.");
+      setMessage("Your inquiry could not be submitted right now. Please try again later.");
     }
   }
 
@@ -956,7 +1167,16 @@ function ContactForm() {
         </label>
         <label>
           Inquiry category <span>*</span>
-          <select name="category" defaultValue="" required>
+          <select
+            name="category"
+            value={category}
+            required
+            onChange={(event) => {
+              const nextCategory = event.currentTarget.value;
+              setCategory(nextCategory);
+              setBusinessDivision(getBusinessDivision(nextCategory, requestedDivision));
+            }}
+          >
             <option value="" disabled>Select a category</option>
             {[
               "General Inquiry",
@@ -971,6 +1191,7 @@ function ContactForm() {
             ].map((category) => <option key={category}>{category}</option>)}
           </select>
         </label>
+        <input type="hidden" name="businessDivision" value={businessDivision} />
         <label>
           Subject <span>*</span>
           <input type="text" name="subject" required maxLength={180} />

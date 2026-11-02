@@ -8,12 +8,37 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { businessAreas, companyName } from "./data";
+import { businessAreas, companyName, ecosystemRoutes } from "./data";
 
 const dropdownLinks = [
   { label: "Business ecosystem", path: "/businesses" },
-  ...businessAreas.map(({ title, path }) => ({ label: title, path })),
+  { label: "Jurivana", path: ecosystemRoutes.jurivana },
+  { label: "Technology", path: ecosystemRoutes.technology },
+  { label: "Engineering", path: ecosystemRoutes.engineering },
+  { label: "Commerce", path: ecosystemRoutes.commerce },
+  { label: "Consulting", path: ecosystemRoutes.consulting },
+  { label: "Academy", path: ecosystemRoutes.academy },
 ];
+
+export function Breadcrumbs({ items }: { items: Array<{ label: string; to?: string }> }) {
+  return (
+    <nav className="breadcrumbs container" aria-label="Breadcrumb">
+      {items.map((item, index) => {
+        const isLast = index === items.length - 1;
+        return (
+          <span key={`${item.label}-${index}`} className="breadcrumb-item">
+            {item.to && !isLast ? (
+              <Link to={item.to}>{item.label}</Link>
+            ) : (
+              <span aria-current={isLast ? "page" : undefined}>{item.label}</span>
+            )}
+            {!isLast && <span className="breadcrumb-separator">/</span>}
+          </span>
+        );
+      })}
+    </nav>
+  );
+}
 
 export function PageMeta({
   title,
@@ -149,7 +174,7 @@ export function Navbar() {
               </div>
             </div>
             <Link to="/services" onClick={closeMenus}>Services</Link>
-            <Link to="/jurivana" onClick={closeMenus}>Brands</Link>
+            <Link to="/ecosystem/jurivana" onClick={closeMenus}>Brands</Link>
             <Link to="/careers" onClick={closeMenus}>Careers</Link>
           </div>
           <Link className="button button-small button-outline nav-cta" to="/contact" onClick={closeMenus}>
@@ -188,12 +213,9 @@ export function Footer() {
         </div>
         <div className="footer-column">
           <h2>Our ecosystem</h2>
-          <Link to="/jurivana">Jurivana</Link>
-          <Link to="/technology">Technology</Link>
-          <Link to="/ecommerce">E-commerce</Link>
-          <Link to="/engineering">Engineering</Link>
-          <Link to="/marketing">Digital marketing</Link>
-          <Link to="/consultancy">Consultancy</Link>
+          {dropdownLinks.slice(1).map((item) => (
+            <Link key={item.path} to={item.path}>{item.label}</Link>
+          ))}
         </div>
         <div className="footer-column">
           <h2>Information</h2>
@@ -260,26 +282,31 @@ export function BusinessCard({
   title,
   description,
   path,
+  href,
   icon: Icon,
   index = 0,
 }: {
+  id?: string;
   title: string;
   description: string;
   path: string;
+  href?: string;
   icon: (typeof businessAreas)[number]["icon"];
   index?: number;
 }) {
   return (
     <Reveal delay={(index % 4) * 0.05} className="business-card-wrap">
-      <article className="business-card">
-        <span className="business-icon"><Icon size={22} strokeWidth={1.7} /></span>
-        <span className="card-index">0{index + 1}</span>
-        <h3>{title}</h3>
-        <p>{description}</p>
-        <Link className="text-link" to={path} aria-label={`Explore ${title}`}>
-          Explore <ArrowRight size={16} />
-        </Link>
-      </article>
+      <Link className="business-card-link" to={href ?? path} aria-label={`Explore ${title}`}>
+        <article className="business-card">
+          <span className="business-icon"><Icon size={22} strokeWidth={1.7} /></span>
+          <span className="card-index">0{index + 1}</span>
+          <h3>{title}</h3>
+          <p>{description}</p>
+          <span className="text-link">
+            Explore <ArrowRight size={16} />
+          </span>
+        </article>
+      </Link>
     </Reveal>
   );
 }
@@ -288,10 +315,12 @@ export function CTASection({
   title = "Let's build something meaningful together.",
   description = "Bring us your next challenge. Let's explore how connected thinking can move it forward.",
   secondaryPath = "/businesses",
+  contactPath = "/contact",
 }: {
   title?: string;
   description?: string;
   secondaryPath?: string;
+  contactPath?: string;
 }) {
   return (
     <section className="cta-section">
@@ -302,7 +331,7 @@ export function CTASection({
           <p>{description}</p>
         </Reveal>
         <Reveal className="cta-actions" delay={0.1}>
-          <Link className="button button-light" to="/contact">
+          <Link className="button button-light" to={contactPath}>
             Contact our team <ArrowRight size={17} />
           </Link>
           <Link className="button button-ghost" to={secondaryPath}>
