@@ -4,6 +4,11 @@ import { Route, Routes, useLocation } from "react-router-dom";
 import { Footer, Navbar, PageMeta } from "./components";
 import { LeadDashboard } from "./features/leads/LeadDashboard";
 import {
+  AdminHome,
+  LoginPage,
+  ProtectedRoute,
+} from "./features/auth/AuthPages";
+import {
   AboutPage,
   BusinessesPage,
   CareersPage,
@@ -72,7 +77,13 @@ function ApplicationRoutes() {
         <Route path="/consultancy" element={<DetailPage path="/consulting" />} />
         <Route path="/careers" element={<CareersPage />} />
         <Route path="/contact" element={<ContactPage />} />
-        <Route path="/admin/leads" element={<LeadDashboard />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/admin" element={<AdminHome />} />
+          <Route element={<ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]} />}>
+            <Route path="/admin/leads" element={<LeadDashboard />} />
+          </Route>
+        </Route>
         <Route path="/privacy-policy" element={<LegalPage path="/privacy-policy" />} />
         <Route path="/terms" element={<LegalPage path="/terms" />} />
         <Route path="/disclaimer" element={<LegalPage path="/disclaimer" />} />

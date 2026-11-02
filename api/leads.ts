@@ -2,8 +2,17 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { isIP } from "node:net";
+import type { LeadStatus } from "../src/features/leads/model.ts";
+import { isLeadStatus } from "../src/features/leads/validation.ts";
 import { leadController } from "../server/lead-controller.ts";
 import type { LeadSubmission, NewLead } from "../src/features/leads/model.ts";
+import {
+  getAuthenticatedUser,
+  hasSameOrigin as hasStrictSameOrigin,
+  isAdminRole,
+  isPrismaNotFound,
+  type AuthenticatedUser,
+} from "../server/auth.ts";
 import {
   LeadValidationError,
   validateLeadSubmission,
@@ -26,6 +35,9 @@ type RateLimitResult = {
 type LeadHandlerDependencies = {
   checkRateLimit: (ip: string) => Promise<RateLimitResult>;
   captureLead: (input: NewLead) => Promise<{ id: string }>;
+  authenticate: (request: ApiRequest) => Promise<AuthenticatedUser | undefined>;
+  listLeads: () => Promise<unknown[]>;
+  updateLeadStatus: (id: string, status: LeadStatus) => Promise<unknown>;
 };
 
 const maxBodyBytes = 12_000;
@@ -112,6 +124,9 @@ function parseBody(request: ApiRequest): unknown {
 export function createLeadHandler({
   checkRateLimit,
   captureLead,
+  authenticate,
+  listLeads,
+  updateLeadStatus,
 }: LeadHandlerDependencies) {
   return async function leadHandler(
     request: ApiRequest,
@@ -120,13 +135,87 @@ export function createLeadHandler({
     applyHeaders(response);
 
     if (request.method === "GET" || request.method === "PATCH") {
-      sendJson(response, 401, {
-        error: "Lead management access is disabled until administrator authentication is configured.",
-      });
+      if (request.method === "PATCH" && !hasStrictSameOrigin(request)) {
+        sendJson(response, 403, { error: "This request is not allowed." });
+        return;
+      }
+
+      let user: AuthenticatedUser | undefined;
+      try {
+        user = await authenticate(request);
+      } catch (error) {
+        console.error(
+          "Lead authorization failed:",
+          error instanceof Error ? error.name : "UnknownError",
+        );
+        sendJson(response, 503, { error: "Lead access is temporarily unavailable." });
+        return;
+      }
+      if (!user) {
+        sendJson(response, 401, { error: "Sign in to access lead management." });
+        return;
+      }
+      if (!isAdminRole(user.role)) {
+        sendJson(response, 403, { error: "Your role cannot access lead management." });
+        return;
+      }
+
+      if (request.method === "GET") {
+        try {
+          sendJson(response, 200, { leads: await listLeads() });
+        } catch (error) {
+          console.error(
+            "Lead list failed:",
+            error instanceof Error ? error.name : "UnknownError",
+          );
+          sendJson(response, 503, { error: "Leads could not be loaded." });
+        }
+        return;
+      }
+
+      if (
+        request.headers["content-type"]
+          ?.split(";")[0]
+          ?.trim()
+          .toLowerCase() !== "application/json"
+      ) {
+        sendJson(response, 415, { error: "Submit the status update as JSON." });
+        return;
+      }
+      const body = parseBody(request);
+      if (
+        typeof body !== "object" ||
+        body === null ||
+        Array.isArray(body) ||
+        typeof (body as Record<string, unknown>).id !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          (body as Record<string, string>).id,
+        ) ||
+        !isLeadStatus((body as Record<string, unknown>).status)
+      ) {
+        sendJson(response, 400, { error: "Submit a valid lead ID and status." });
+        return;
+      }
+      try {
+        const input = body as { id: string; status: LeadStatus };
+        sendJson(response, 200, {
+          lead: await updateLeadStatus(input.id, input.status),
+        });
+      } catch (error) {
+        if (isPrismaNotFound(error)) {
+          sendJson(response, 404, { error: "The lead was not found." });
+          return;
+        }
+        console.error(
+          "Lead status update failed:",
+          error instanceof Error ? error.name : "UnknownError",
+        );
+        sendJson(response, 503, { error: "Lead status could not be updated." });
+      }
       return;
     }
     if (request.method !== "POST") {
-      response.setHeader("Allow", "POST");
+      response.setHeader("Allow", "GET, PATCH, POST");
       sendJson(response, 405, { error: "Method not allowed." });
       return;
     }
@@ -254,6 +343,10 @@ export default async function handler(
       return { success: result.success, reset: result.reset };
     },
     captureLead: async (input) => leadController.capture(input),
+    authenticate: async (authRequest) => getAuthenticatedUser(authRequest),
+    listLeads: async () => leadController.list(),
+    updateLeadStatus: async (id, status) =>
+      leadController.updateStatus(id, status),
   });
   await leadHandler(request, response);
 }

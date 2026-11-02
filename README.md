@@ -15,6 +15,8 @@ For local PostgreSQL and Prisma setup, follow
 database, replacing the password placeholder locally. Prisma CLI reads `.env`;
 Vite reads `.env.local`. Never commit either file or paste database credentials
 into chat. CRM migrations are scoped to the `giemens_crm` schema.
+For admin login and role permissions, see
+[the authentication guide](./docs/authentication.md).
 
 `npm run dev` starts the Vite website. To run the Vercel serverless contact
 function locally, add the required development credentials to `.env.local`,
@@ -46,6 +48,8 @@ Values in the browser must use the `VITE_` prefix; never put API keys in a
 | --- | --- | --- |
 | `VITE_SITE_URL` | Required for production | Public site origin, e.g. `https://www.example.com`; used for canonical tags and sitemap URLs. |
 | `VITE_CONTACT_ENDPOINT` | Required for production | Must be `/api/contact`. |
+| `DATABASE_URL` | Required for CRM and admin authentication | PostgreSQL connection URL for the `giemens_crm` schema. |
+| `AUTH_RATE_LIMIT_SECRET` | Required for production | Random secret of at least 32 bytes for hashing login rate-limit keys. |
 | `RESEND_API_KEY` | Required | Secret API key from the Resend account. |
 | `CONTACT_TO_EMAIL` | Required | Business mailbox that receives inquiries. |
 | `CONTACT_FROM_EMAIL` | Required | Sender address on a domain verified with Resend. |

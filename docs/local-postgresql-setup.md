@@ -29,9 +29,10 @@ both files should use this shape:
 postgresql://postgres:<your-local-password>@127.0.0.1:5432/giemens?schema=giemens_crm
 ```
 
-The seed reads `ADMIN_EMAIL` and `ADMIN_NAME` from `.env`. If omitted, it
-creates the local admin record `admin@giemens.local` /
-`GIEMENS Local Admin`.
+The seed reads `ADMIN_EMAIL`, `ADMIN_NAME`, and `ADMIN_PASSWORD` from `.env`.
+The default email and name are `admin@giemens.local` and
+`GIEMENS Local Admin`; set a unique password of at least 12 characters in
+`.env` before seeding.
 
 ## 2. Create the local database if needed
 
@@ -80,9 +81,8 @@ npm run prisma:seed
 
 The idempotent seed creates or updates the `SUPER_ADMIN`, `ADMIN`, `MANAGER`,
 and `EMPLOYEE` roles and creates or updates one user assigned to `SUPER_ADMIN`.
-The default user has `passwordHash = null`. Authentication is not implemented,
-so this database record cannot be used to log in. The seed does not create a
-password, expose an API, or contact an external service.
+It stores a salted scrypt password hash, never plaintext. Authentication
+sessions are defined by the additive authentication migration.
 
 ## Validation commands
 

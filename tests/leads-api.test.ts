@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from "node:http";
 import { createLeadHandler } from "../api/leads.ts";
 import type { LeadSubmission, NewLead } from "../src/features/leads/model.ts";
+import type { AuthenticatedUser } from "../server/auth.ts";
 
 const validSubmission: LeadSubmission = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -65,6 +66,7 @@ function makeHandler(
   captureLead: (input: NewLead) => Promise<{ id: string }> = async (input) => ({
     id: input.id,
   }),
+  authenticatedUser?: AuthenticatedUser,
 ) {
   const captured: NewLead[] = [];
   const handler = createLeadHandler({
@@ -73,6 +75,9 @@ function makeHandler(
       captured.push(input);
       return captureLead(input);
     },
+    authenticate: async () => authenticatedUser,
+    listLeads: async () => [],
+    updateLeadStatus: async (id, status) => ({ id, status }),
   });
   return { handler, captured };
 }
@@ -111,6 +116,51 @@ test("does not expose lead reads or status changes before authentication", async
     assert.equal(output.response.statusCode, 401);
   }
   assert.equal(captured.length, 0);
+});
+
+test("allows only SUPER_ADMIN and ADMIN to read lead records", async () => {
+  const employee: AuthenticatedUser = {
+    id: "00000000-0000-4000-8000-000000000010",
+    email: "employee@example.com",
+    name: "Employee",
+    role: "EMPLOYEE",
+  };
+  const denied = makeResponse();
+  await makeHandler(undefined, employee).handler(
+    makeRequest({ method: "GET" }),
+    denied.response,
+  );
+  assert.equal(denied.response.statusCode, 403);
+
+  const admin: AuthenticatedUser = { ...employee, role: "ADMIN" };
+  const allowed = makeResponse();
+  await makeHandler(undefined, admin).handler(
+    makeRequest({ method: "GET" }),
+    allowed.response,
+  );
+  assert.equal(allowed.response.statusCode, 200);
+  assert.deepEqual(allowed.body.leads, []);
+});
+
+test("requires same-origin lead status updates and administrator role", async () => {
+  const admin: AuthenticatedUser = {
+    id: "00000000-0000-4000-8000-000000000010",
+    email: "admin@example.com",
+    name: "Admin",
+    role: "SUPER_ADMIN",
+  };
+  const output = makeResponse();
+  const request = makeRequest({
+    method: "PATCH",
+    body: {
+      id: validSubmission.id,
+      status: "QUALIFIED",
+    },
+  });
+  const { handler } = makeHandler(undefined, admin);
+  await handler(request, output.response);
+  assert.equal(output.response.statusCode, 200);
+  assert.equal((output.body.lead as { status: string }).status, "QUALIFIED");
 });
 
 test("rejects cross-origin lead submissions", async () => {

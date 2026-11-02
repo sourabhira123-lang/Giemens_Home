@@ -513,9 +513,18 @@ h1, h2, h3, .brand-name strong { font-family: "Manrope", sans-serif; }
 .spinner { width: 15px; height: 15px; border: 2px solid rgba(15,42,29,.25); border-top-color: var(--midnight-navy); border-radius: 50%; animation: spin .75s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Browser-local lead dashboard */
+/* Lead dashboard and admin authentication */
 .lead-dashboard { min-height: 60vh; background: var(--background-light); }
 .lead-storage-notice { margin: 0 0 28px; padding: 14px 17px; border: 1px solid var(--line-light); color: var(--muted-on-light); font-size: 11px; line-height: 1.7; }
+.auth-section { min-height: 60vh; background: var(--background-light); }
+.auth-container { max-width: 720px; }
+.auth-form { display: grid; gap: 18px; max-width: 520px; }
+.auth-form label { display: flex; flex-direction: column; gap: 7px; color: var(--deep-ocean); font-size: 11px; font-weight: 600; }
+.auth-form input { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid rgba(55,85,52,.32); border-radius: 0; background: var(--text-primary); color: var(--midnight-navy); font-size: 13px; font-weight: 400; }
+.auth-form .form-status { margin: 0; }
+.auth-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.admin-breadcrumb { margin: -20px 0 30px; color: var(--muted-on-light); font-size: 11px; }
+.admin-breadcrumb a { color: var(--corporate-blue); text-decoration: underline; text-underline-offset: 3px; }
 .lead-metrics { margin-bottom: 48px; }
 .lead-metrics .benefit-card { min-height: 140px; }
 .lead-metrics .benefit-number { font-size: 36px; }

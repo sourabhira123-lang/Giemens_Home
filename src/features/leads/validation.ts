@@ -1,6 +1,7 @@
 import {
   businessDivisions,
   leadStatuses,
+  type LeadStatus,
   type LeadSubmission,
   type NewLead,
 } from "./model.ts";
@@ -95,6 +96,6 @@ export function validateLeadSubmission(input: LeadSubmission): NewLead {
   };
 }
 
-export function isLeadStatus(value: unknown): value is NewLead["status"] {
+export function isLeadStatus(value: unknown): value is LeadStatus {
   return leadStatuses.includes(value as (typeof leadStatuses)[number]);
 }

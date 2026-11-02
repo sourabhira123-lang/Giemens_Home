@@ -14,6 +14,8 @@ if (isVercelProduction && !env.VITE_CONTACT_ENDPOINT?.trim()) {
 }
 if (isVercelProduction) {
   const requiredServerVariables = [
+    "DATABASE_URL",
+    "AUTH_RATE_LIMIT_SECRET",
     "RESEND_API_KEY",
     "CONTACT_TO_EMAIL",
     "CONTACT_FROM_EMAIL",
@@ -27,6 +29,10 @@ if (isVercelProduction) {
     console.error(
       `Missing required Vercel Production environment variables: ${missingVariables.join(", ")}`,
     );
+    process.exit(1);
+  }
+  if (Buffer.byteLength(env.AUTH_RATE_LIMIT_SECRET.trim(), "utf8") < 32) {
+    console.error("AUTH_RATE_LIMIT_SECRET must contain at least 32 characters.");
     process.exit(1);
   }
 }
