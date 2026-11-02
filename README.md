@@ -4,20 +4,21 @@
 
 ```bash
 npm install
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+if (-not (Test-Path .env.local)) { Copy-Item .env.example .env.local }
 npm run dev
 ```
 
-For the local CRM database, the existing PostgreSQL 18 instance is configured
-in pgAdmin at `127.0.0.1:5432`, with the existing `giemens` database and
-`postgres` login. Set `DATABASE_URL` in the ignored local `.env` file to that
-database, replacing `YOUR_LOCAL_PASSWORD` locally. Never commit `.env` or paste
-database credentials into chat. CRM migrations are scoped to the
-`giemens_crm` schema and must not modify the existing `public` schema.
+For local PostgreSQL and Prisma setup, follow
+[the database setup guide](./docs/local-postgresql-setup.md). Set
+`DATABASE_URL` in the ignored `.env` and `.env.local` files to your local
+database, replacing the password placeholder locally. Prisma CLI reads `.env`;
+Vite reads `.env.local`. Never commit either file or paste database credentials
+into chat. CRM migrations are scoped to the `giemens_crm` schema.
 
 `npm run dev` starts the Vite website. To run the Vercel serverless contact
-function locally, copy `.env.example` to `.env.local`, add the required
-development credentials below, then run `npx vercel dev`. Opening the site with
+function locally, add the required development credentials to `.env.local`,
+then run `npx vercel dev`. Opening the site with
 `npm run dev` alone serves only the frontend; Vite does not execute the
 serverless `/api/contact` function. Vercel CLI may ask you to authenticate or
 link the project. Do not enter production secrets into a public or shared
