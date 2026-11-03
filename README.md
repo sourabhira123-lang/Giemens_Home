@@ -61,6 +61,11 @@ rate-limit service is unavailable. It allows five contact attempts per IP per
 15 minutes. Keep the Upstash and Resend credentials server-side in Vercel
 environment settings and rotate them if exposed.
 
+The project targets Node.js 22.x on Vercel. Its npm `allowScripts` policy
+approves the locked `esbuild` install script required to install esbuild's
+platform binary; update that pinned approval when intentionally upgrading
+esbuild.
+
 ## Tests and production build
 
 ```bash
