@@ -31,6 +31,7 @@ Set these variables in the platform:
 | `CONTACT_TO_EMAIL`, `CONTACT_FROM_EMAIL` | Real inbox and SMTP-authorized sender. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | HTTPS Upstash REST credentials for contact/lead rate limits. |
 | `AZURE_STORAGE_ACCOUNT_URL`, `AZURE_STORAGE_CONTAINER` | Private Blob account endpoint and container for document upload/download SAS URLs. The Azure template provisions the container and managed identity permissions. |
+| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Optional service-principal credentials for hosts without workload/user-assigned identity. Store them as secrets; Azure Container Apps uses its managed identity instead. |
 | `TRUST_PROXY_HOPS` | Number of trusted reverse proxies; keep at `0` unless requests can only reach the app through that proxy chain. |
 
 This app uses opaque, random, database-backed sessions with hashed tokens and
@@ -109,12 +110,27 @@ access to the container port. The app trusts no proxy headers by default.
    does not yet include a Blob adapter or upload API.
 3. Configure an Azure Container Registry and build/push the image with the
    public `VITE_SITE_URL` as a build argument.
-4. Deploy the image to Azure Container Apps or App Service for Containers.
-   Configure health probing at `/healthz`, ingress/TLS, and the variables above
-   using Key Vault references or platform secrets.
-5. Run the database release commands before routing users to the new revision.
-6. Confirm DNS/TLS, direct page refreshes, login/logout, lead access, SMTP
-   delivery, rate-limit behavior, backups, logs, and alerts.
+4. Create a Log Analytics workspace and prepare an untracked, ignored
+   `infra/azure/production.parameters.json` file using the parameters described
+   in [the Azure template guide](../infra/azure/README.md).
+5. Deploy the Bicep template to create the Container Apps environment, app,
+   private Blob container, user-assigned identity, health probes, CORS rule and
+   scoped storage/registry roles:
+
+   ```powershell
+   az deployment group create `
+     --resource-group <resource-group> `
+     --template-file infra/azure/main.bicep `
+     --parameters @infra/azure/production.parameters.json
+   ```
+
+6. Configure custom domain/TLS and network access. The Container App ingress
+   must reach PostgreSQL and Upstash; keep PostgreSQL private and restrict its
+   firewall to the app network.
+7. Run the database release checklist before routing customer traffic.
+8. Confirm direct page refreshes, login/logout, role restrictions, customer and
+   request workflows, SMTP, document upload/download, rate limits, backups,
+   logs and alerts.
 
 Use managed identity for Azure services when a supported adapter is implemented;
 never bake storage credentials into the image.
@@ -147,11 +163,11 @@ PostgreSQL to the public internet.
 
 ## GitHub Actions
 
-`.github/workflows/ci.yml` validates Prisma, type-checks, runs tests, builds the
-static output, and builds the container on pushes and pull requests. It does
-not deploy or access production secrets. Add a separate, environment-protected
-release workflow only after the target host, approvals, and secret-management
-policy are selected.
+`.github/workflows/ci.yml` validates Prisma, type-checks, runs tests, audits
+runtime dependencies, builds the static output and container, and compiles the
+Bicep template on pushes and pull requests. It does not deploy or access
+production secrets. Add a separate, environment-protected release workflow
+only after host approvals and secret-management policies are selected.
 
 ## Current scope and go-live blockers
 

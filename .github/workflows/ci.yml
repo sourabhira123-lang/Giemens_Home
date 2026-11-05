@@ -29,4 +29,5 @@ jobs:
         env:
           VITE_SITE_URL: https://www.giemens.com
           VITE_CONTACT_ENDPOINT: /api/contact
+      - run: az bicep build --file infra/azure/main.bicep --stdout > /dev/null
       - run: docker build --build-arg VITE_SITE_URL=https://www.giemens.com -t giemens-home:ci .

@@ -3,6 +3,9 @@
 This project uses the PostgreSQL database `giemens` and the Prisma schema
 `giemens_crm`. The checked-in initial migration creates that schema and the
 project tables; Prisma does not reset or drop the database when applying it.
+See [PostgreSQL connection troubleshooting](./postgresql-troubleshooting.md)
+for the local environment findings, pgAdmin password recovery steps, and
+verification scripts.
 
 ## 1. Configure local environment
 
@@ -23,7 +26,8 @@ if (-not (Test-Path .env.local)) {
 ```
 
 `.env.local` is a local template and is ignored by Git. The `DATABASE_URL` in
-both files should use this shape:
+both files should use this shape (URL-encode reserved characters in the
+password, for example `@` as `%40`):
 
 ```text
 postgresql://postgres:<your-local-password>@127.0.0.1:5432/giemens?schema=giemens_crm
@@ -60,10 +64,15 @@ applying a database migration.
 
 ## 4. Apply checked-in migrations
 
-Database authentication is currently pending on the configured machine. Do not
-run this step until the actual PostgreSQL password is available and the local
-database owner confirms the target. Then apply the reviewed, additive
-migrations:
+First verify the connection and migration status without changing the database:
+
+```powershell
+.\scripts\connect-db.ps1
+.\scripts\verify-db.ps1
+```
+
+After both checks succeed and the local database owner confirms the target,
+apply the reviewed, additive migrations:
 
 ```powershell
 npm run db:deploy
@@ -71,6 +80,10 @@ npm run db:deploy
 
 This runs `prisma migrate deploy` and applies only checked-in migrations. It
 does not generate a migration or reset the database.
+
+The currently inspected local database has all three checked-in migrations
+applied and all 14 expected tables verified. No seed was run. On that database,
+`npm run db:deploy` should report that the schema is up to date.
 
 ## 5. Seed development roles and admin record
 

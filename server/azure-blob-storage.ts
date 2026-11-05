@@ -63,6 +63,7 @@ async function createBlobSas(
       permissions: BlobSASPermissions.parse(permissions),
       startsOn,
       expiresOn,
+      ...(permissions === "r" ? { contentType: "application/octet-stream" } : {}),
       ...(contentDisposition ? { contentDisposition } : {}),
     },
     delegationKey,
@@ -114,6 +115,8 @@ export async function verifyUploadedBlob(
   }
   const hash = createHash("sha256");
   let bytesRead = 0;
+  const prefix: Buffer[] = [];
+  let prefixSize = 0;
   for await (const chunk of download.readableStreamBody) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     bytesRead += buffer.byteLength;
@@ -121,6 +124,28 @@ export async function verifyUploadedBlob(
       throw new Error("Uploaded document exceeded its declared size.");
     }
     hash.update(buffer);
+    if (prefixSize < 12) {
+      const sample = buffer.subarray(0, 12 - prefixSize);
+      prefix.push(sample);
+      prefixSize += sample.byteLength;
+    }
+  }
+  const signature = Buffer.concat(prefix);
+  const validSignature =
+    expected.contentType === "application/pdf"
+      ? signature.subarray(0, 5).toString("ascii") === "%PDF-"
+      : expected.contentType === "image/jpeg"
+        ? signature[0] === 0xff && signature[1] === 0xd8 && signature[2] === 0xff
+        : expected.contentType === "image/png"
+          ? signature.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+          : expected.contentType === "image/webp"
+            ? signature.subarray(0, 4).toString("ascii") === "RIFF" &&
+              signature.subarray(8, 12).toString("ascii") === "WEBP"
+            : expected.contentType ===
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document" &&
+              signature[0] === 0x50 && signature[1] === 0x4b;
+  if (!validSignature) {
+    throw new Error("Uploaded document signature does not match its declared type.");
   }
   if (
     bytesRead !== expected.sizeBytes ||

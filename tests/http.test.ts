@@ -37,6 +37,12 @@ test("container HTTP server serves health, prerendered pages, and safe API error
     assert.equal(missingApi.status, 404);
     assert.deepEqual(await missingApi.json(), { error: "Not found." });
 
+    const crmAuth = await fetch(`${origin}/api/crm?resource=customers`);
+    assert.equal(crmAuth.status, 401);
+
+    const documentsAuth = await fetch(`${origin}/api/documents`);
+    assert.equal(documentsAuth.status, 401);
+
     const traversal = await fetch(`${origin}/%2e%2e%2f.env`);
     assert.equal(traversal.status, 404);
   } finally {

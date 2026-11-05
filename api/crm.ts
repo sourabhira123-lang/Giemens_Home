@@ -281,7 +281,12 @@ async function listResource(resource: Resource, request: CrmRequest, user: Authe
             include: { user: { select: { id: true, name: true } } },
           },
           documents: {
-            where: { document: { status: "READY" } },
+            where: {
+              document: {
+                status: "READY",
+                ...(isManager(user) ? {} : { ownerUserId: user.id }),
+              },
+            },
             include: {
               document: {
                 select: {

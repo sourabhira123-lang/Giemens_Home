@@ -15,6 +15,12 @@ export function LeadDashboard() {
   const [selectedLeadId, setSelectedLeadId] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sortBy, setSortBy] = useState<"createdAt" | "name" | "status">("createdAt");
+  const [direction, setDirection] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
 
   useEffect(() => {
     let active = true;
@@ -50,7 +56,30 @@ export function LeadDashboard() {
   }, []);
 
   const metrics = useMemo(() => getLeadMetrics(leads), [leads]);
+  const filteredLeads = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return leads
+      .filter((lead) => !statusFilter || lead.status === statusFilter)
+      .filter((lead) => !query || [lead.name, lead.email, lead.company, lead.subject]
+        .some((value) => value?.toLowerCase().includes(query)))
+      .sort((left, right) => {
+        const comparison = sortBy === "name"
+          ? left.name.localeCompare(right.name)
+          : sortBy === "status"
+            ? left.status.localeCompare(right.status)
+            : left.createdAt.localeCompare(right.createdAt);
+        return direction === "asc" ? comparison : -comparison;
+      });
+  }, [direction, leads, search, sortBy, statusFilter]);
+  const pageCount = Math.max(1, Math.ceil(filteredLeads.length / pageSize));
+  const visibleLeads = filteredLeads.slice((page - 1) * pageSize, page * pageSize);
   const selectedLead = leads.find((lead) => lead.id === selectedLeadId);
+
+  useEffect(() => {
+    if (selectedLeadId && !filteredLeads.some((lead) => lead.id === selectedLeadId)) {
+      setSelectedLeadId(filteredLeads[0]?.id ?? "");
+    }
+  }, [filteredLeads, selectedLeadId]);
 
   async function updateLeadStatus(id: string, status: LeadStatus) {
     setError("");
@@ -95,6 +124,30 @@ export function LeadDashboard() {
           />
           <p className="admin-breadcrumb"><Link to="/admin">Administration</Link> / Lead management</p>
           {error && <p className="form-status form-status-error" role="alert">{error}</p>}
+          <div className="crm-toolbar">
+            <label>
+              Search
+              <input value={search} onChange={(event) => { setPage(1); setSearch(event.currentTarget.value); }} placeholder="Search leads" />
+            </label>
+            <label>
+              Status
+              <select value={statusFilter} onChange={(event) => { setPage(1); setStatusFilter(event.currentTarget.value); }}>
+                <option value="">All statuses</option>
+                {leadStatuses.map((status) => <option value={status} key={status}>{status.replaceAll("_", " ")}</option>)}
+              </select>
+            </label>
+            <label>
+              Sort by
+              <select value={sortBy} onChange={(event) => setSortBy(event.currentTarget.value as typeof sortBy)}>
+                <option value="createdAt">Created date</option>
+                <option value="name">Name</option>
+                <option value="status">Status</option>
+              </select>
+            </label>
+            <button className="button button-outline" type="button" onClick={() => setDirection((value) => value === "asc" ? "desc" : "asc")}>
+              {direction === "asc" ? "Ascending" : "Descending"}
+            </button>
+          </div>
           {loading ? (
             <p aria-live="polite">Loading lead records…</p>
           ) : (
@@ -114,11 +167,11 @@ export function LeadDashboard() {
               <div className="lead-dashboard-grid">
                 <section aria-labelledby="recent-leads-heading">
                   <h2 className="lead-panel-heading" id="recent-leads-heading">Recent Leads</h2>
-                  {metrics.recent.length === 0 ? (
-                    <p className="lead-empty">No inquiries have been captured yet.</p>
+                  {visibleLeads.length === 0 ? (
+                    <p className="lead-empty">No inquiries match these filters.</p>
                   ) : (
                     <div className="lead-list">
-                      {metrics.recent.map((lead) => (
+                      {visibleLeads.map((lead) => (
                         <button
                           className={`lead-list-item${lead.id === selectedLeadId ? " lead-list-item-selected" : ""}`}
                           key={lead.id}
@@ -135,6 +188,13 @@ export function LeadDashboard() {
                       ))}
                     </div>
                   )}
+                  <div className="crm-pagination">
+                    <span>{filteredLeads.length} leads · Page {page} of {pageCount}</span>
+                    <div>
+                      <button className="button button-outline" type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button>
+                      <button className="button button-outline" type="button" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)}>Next</button>
+                    </div>
+                  </div>
                 </section>
                 <section aria-labelledby="lead-details-heading">
                   <h2 className="lead-panel-heading" id="lead-details-heading">Lead Details</h2>

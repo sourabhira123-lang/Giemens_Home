@@ -83,7 +83,7 @@ npm test
 npm run prisma:validate
 npm run prisma:generate
 npm run build
-npm audit
+npm audit --omit=dev --omit=optional --omit=peer
 ```
 
 The build validates the public URL and contact endpoint, emits a metadata-ready

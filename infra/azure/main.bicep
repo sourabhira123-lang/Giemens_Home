@@ -269,6 +269,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
               value: 'https://${storage.name}.blob.core.windows.net'
             }
             {
+              name: 'AZURE_CLIENT_ID'
+              value: pullIdentity.properties.clientId
+            }
+            {
               name: 'AZURE_STORAGE_CONTAINER'
               value: documentsContainer.name
             }

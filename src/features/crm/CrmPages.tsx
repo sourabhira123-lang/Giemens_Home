@@ -239,6 +239,7 @@ export function CrmWorkspace({ resource }: { resource: Resource }) {
     event.preventDefault();
     setSaving(true);
     setError("");
+    let createdRequestId = "";
     try {
       const saved = await requestJson<{ item?: RecordRow }>(`/api/crm?resource=${resource}`, {
         method: resource === "customers" && editingId ? "PATCH" : "POST",
@@ -252,6 +253,7 @@ export function CrmWorkspace({ resource }: { resource: Resource }) {
       if (resource === "requests" && files.length > 0) {
         const requestId = saved.item?.id;
         if (!requestId) throw new Error("The request was created, but its attachment target was not returned.");
+        createdRequestId = requestId;
         for (const file of files) {
           await uploadFile(file, {
             requestId,
@@ -264,9 +266,17 @@ export function CrmWorkspace({ resource }: { resource: Resource }) {
       setEditingId("");
       setForm({});
       setPage(1);
-      await load();
+      if (page === 1) await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The record could not be saved.");
+      if (createdRequestId) {
+        setFiles([]);
+        setForm({});
+        setPage(1);
+        if (page === 1) await load();
+        setError(`Request ${createdRequestId} was created, but an attachment could not be uploaded. It may need an administrator's review.`);
+      } else {
+        setError(cause instanceof Error ? cause.message : "The record could not be saved.");
+      }
     } finally {
       setSaving(false);
     }

@@ -5,6 +5,12 @@
   "functions": {
     "api/contact.ts": {
       "maxDuration": 10
+    },
+    "api/crm.ts": {
+      "maxDuration": 15
+    },
+    "api/documents.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

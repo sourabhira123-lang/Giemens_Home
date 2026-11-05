@@ -8,6 +8,9 @@ app identity the Blob Data Contributor and Blob Delegator roles used for
 short-lived user-delegation SAS URLs. PostgreSQL, Redis, SMTP, ACR, and the
 Log Analytics workspace are provisioned separately.
 
+The template sets `AZURE_CLIENT_ID` to the user-assigned identity so
+`DefaultAzureCredential` selects the intended identity in Container Apps.
+
 ## Prerequisites
 
 - Azure CLI logged into the intended subscription.
