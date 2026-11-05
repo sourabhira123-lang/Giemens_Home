@@ -1,0 +1,32 @@
+services:
+  giemens:
+    build:
+      context: .
+      args:
+        VITE_SITE_URL: ${VITE_SITE_URL:?Set VITE_SITE_URL to the public HTTPS origin}
+    image: giemens-home:local
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to PostgreSQL}
+      AUTH_RATE_LIMIT_SECRET: ${AUTH_RATE_LIMIT_SECRET:?Set AUTH_RATE_LIMIT_SECRET}
+      SMTP_HOST: ${SMTP_HOST:?Set SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:?Set SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?Set SMTP_PASSWORD}
+      CONTACT_TO_EMAIL: ${CONTACT_TO_EMAIL:?Set CONTACT_TO_EMAIL}
+      CONTACT_FROM_EMAIL: ${CONTACT_FROM_EMAIL:?Set CONTACT_FROM_EMAIL}
+      UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL:?Set UPSTASH_REDIS_REST_URL}
+      UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN:?Set UPSTASH_REDIS_REST_TOKEN}
+      AZURE_STORAGE_ACCOUNT_URL: ${AZURE_STORAGE_ACCOUNT_URL:?Set AZURE_STORAGE_ACCOUNT_URL}
+      AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER:-documents}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-0}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

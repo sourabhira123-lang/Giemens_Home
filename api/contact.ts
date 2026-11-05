@@ -2,7 +2,7 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { isIP } from "node:net";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import {
   isValidEmail,
   validateContactPayload,
@@ -219,12 +219,23 @@ function requiredEnv(
 
 function readRuntimeConfig(env: NodeJS.ProcessEnv) {
   const errors: string[] = [];
-  const apiKey = requiredEnv(env, "RESEND_API_KEY", errors);
+  const smtpHost = requiredEnv(env, "SMTP_HOST", errors);
+  const smtpUser = requiredEnv(env, "SMTP_USER", errors);
+  const smtpPassword = requiredEnv(env, "SMTP_PASSWORD", errors);
   const recipient = requiredEnv(env, "CONTACT_TO_EMAIL", errors);
   const sender = requiredEnv(env, "CONTACT_FROM_EMAIL", errors);
   const redisUrl = requiredEnv(env, "UPSTASH_REDIS_REST_URL", errors);
   const redisToken = requiredEnv(env, "UPSTASH_REDIS_REST_TOKEN", errors);
+  const smtpPort = env.SMTP_PORT?.trim() ? Number(env.SMTP_PORT) : 587;
 
+  if (smtpHost && /[\s\r\n]/.test(smtpHost)) errors.push("SMTP_HOST");
+  if (
+    !Number.isInteger(smtpPort) ||
+    smtpPort < 1 ||
+    smtpPort > 65535
+  ) {
+    errors.push("SMTP_PORT");
+  }
   if (recipient && !isValidEmail(recipient)) errors.push("CONTACT_TO_EMAIL");
   if (sender && !isValidEmail(sender)) errors.push("CONTACT_FROM_EMAIL");
   if (redisUrl) {
@@ -243,7 +254,10 @@ function readRuntimeConfig(env: NodeJS.ProcessEnv) {
   }
   return {
     ok: true as const,
-    apiKey,
+    smtpHost,
+    smtpPort,
+    smtpUser,
+    smtpPassword,
     recipient,
     sender,
     redisUrl,
@@ -272,7 +286,15 @@ export default async function handler(
     limiter: Ratelimit.slidingWindow(5, "15 m"),
     prefix: "giemens:contact",
   });
-  const resend = new Resend(config.apiKey);
+  const mailer = nodemailer.createTransport({
+    host: config.smtpHost,
+    port: config.smtpPort,
+    secure: config.smtpPort === 465,
+    auth: { user: config.smtpUser, pass: config.smtpPassword },
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+  });
 
   const contactHandler = createContactHandler({
     checkRateLimit: async (ip) => {
@@ -280,9 +302,9 @@ export default async function handler(
       return { success: result.success, reset: result.reset };
     },
     sendEmail: async (inquiry) => {
-      const result = await resend.emails.send({
+      const result = await mailer.sendMail({
         from: config.sender,
-        to: [config.recipient],
+        to: config.recipient,
         replyTo: inquiry.email,
         subject: `[GIEMENS] ${inquiry.subject}`,
         text: [
@@ -296,10 +318,7 @@ export default async function handler(
           inquiry.message,
         ].join("\n"),
       });
-      if (result.error) {
-        throw new Error(result.error.message);
-      }
-      return Boolean(result.data?.id);
+      return Boolean(result.messageId);
     },
   });
 

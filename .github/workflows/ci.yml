@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://build:build@127.0.0.1:5432/giemens?schema=giemens_crm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:validate
+      - run: npm run prisma:generate
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm audit --omit=dev --omit=optional --omit=peer --audit-level=high
+      - run: npm run build
+        env:
+          VITE_SITE_URL: https://www.giemens.com
+          VITE_CONTACT_ENDPOINT: /api/contact
+      - run: docker build --build-arg VITE_SITE_URL=https://www.giemens.com -t giemens-home:ci .

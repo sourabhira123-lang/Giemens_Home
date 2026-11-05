@@ -58,18 +58,19 @@ npm run prisma:generate
 These commands validate the local schema and generate the client without
 applying a database migration.
 
-## 4. Apply the initial migration
+## 4. Apply checked-in migrations
 
-After confirming `DATABASE_URL` points to the intended local database and the
-schema has been reviewed, apply the checked-in migration:
+Database authentication is currently pending on the configured machine. Do not
+run this step until the actual PostgreSQL password is available and the local
+database owner confirms the target. Then apply the reviewed, additive
+migrations:
 
 ```powershell
-npm run prisma:migrate
+npm run db:deploy
 ```
 
-This runs `prisma migrate dev`; it changes the local database schema. It does
-not reset the database. Review the proposed migration before confirming any
-additional migration Prisma proposes.
+This runs `prisma migrate deploy` and applies only checked-in migrations. It
+does not generate a migration or reset the database.
 
 ## 5. Seed development roles and admin record
 
@@ -77,12 +78,17 @@ After the migration succeeds:
 
 ```powershell
 npm run prisma:seed
+npm run db:verify
 ```
 
 The idempotent seed creates or updates the `SUPER_ADMIN`, `ADMIN`, `MANAGER`,
 and `EMPLOYEE` roles and creates or updates one user assigned to `SUPER_ADMIN`.
 It stores a salted scrypt password hash, never plaintext. Authentication
 sessions are defined by the additive authentication migration.
+The CRM extension migration adds project/task statuses and assignments,
+Jurivana requests/comments, document metadata, and audit logs. Table
+verification checks these along with roles, users, leads, activities,
+customers, projects, tasks, sessions, and auth rate limits.
 
 ## Validation commands
 

@@ -99,6 +99,34 @@
     "title": "Lead Management | GIEMENS",
     "description": "Review website inquiries captured in this browser."
   },
+  "/admin/dashboard": {
+    "title": "Dashboard | GIEMENS",
+    "description": "GIEMENS operations dashboard."
+  },
+  "/admin/customers": {
+    "title": "Customers | GIEMENS",
+    "description": "Manage GIEMENS customer records."
+  },
+  "/admin/projects": {
+    "title": "Projects | GIEMENS",
+    "description": "Manage GIEMENS projects."
+  },
+  "/admin/tasks": {
+    "title": "Tasks | GIEMENS",
+    "description": "Manage GIEMENS project tasks."
+  },
+  "/admin/requests": {
+    "title": "Jurivana Requests | GIEMENS",
+    "description": "Manage Jurivana legal, compliance, property verification and business registration requests."
+  },
+  "/admin/activities": {
+    "title": "Activities | GIEMENS",
+    "description": "Review authorized GIEMENS CRM activity records."
+  },
+  "/admin/documents": {
+    "title": "Documents | GIEMENS",
+    "description": "Upload and manage GIEMENS client documents."
+  },
   "/privacy-policy": {
     "title": "Privacy Policy | GIEMENS",
     "description": "How the GIEMENS website handles information submitted through its forms."

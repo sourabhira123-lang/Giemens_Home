@@ -548,6 +548,41 @@ h1, h2, h3, .brand-name strong { font-family: "Manrope", sans-serif; }
 .lead-message { margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line-light); color: var(--deep-ocean); font-size: 11px; }
 .lead-message p { margin: 8px 0 0; color: var(--muted-on-light); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 .lead-empty { padding: 18px; border: 1px solid var(--line-light); color: var(--muted-on-light); font-size: 11px; }
+.crm-metrics { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
+.crm-metrics .benefit-card { min-height: 120px; }
+.crm-metrics .benefit-number { font-size: clamp(20px, 3vw, 31px); }
+.crm-quick-links, .crm-request-actions, .crm-pagination, .crm-pagination > div { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.crm-activity { display: grid; gap: 5px; padding: 14px 10px; border-bottom: 1px solid var(--line-light); color: var(--deep-ocean); font-size: 11px; }
+.crm-activity strong { color: var(--midnight-navy); font-size: 12px; }
+.crm-activity small { color: var(--muted-on-light); font-size: 9px; }
+.crm-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 0 0 26px; }
+.crm-toolbar label, .crm-create-form label, .crm-request-actions label { display: grid; gap: 6px; color: var(--deep-ocean); font-size: 10px; font-weight: 600; }
+.crm-toolbar input, .crm-toolbar select, .crm-create-form input, .crm-create-form select, .crm-create-form textarea, .crm-request-actions select, .crm-comment-form textarea { min-height: 40px; padding: 8px 10px; border: 1px solid rgba(55,85,52,.32); border-radius: 0; background: var(--text-primary); color: var(--midnight-navy); font: inherit; }
+.crm-toolbar label:first-child { flex: 1 1 220px; }
+.crm-create-form { max-width: none; margin: 0 0 30px; }
+.crm-create-form h2 { margin-bottom: 15px; }
+.crm-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.crm-create-form textarea, .crm-comment-form textarea { min-height: 90px; resize: vertical; }
+.crm-wide-field { grid-column: 1 / -1; }
+.crm-table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--line-light); }
+.crm-table { width: 100%; border-collapse: collapse; background: var(--background-light); color: var(--deep-ocean); font-size: 11px; text-align: left; }
+.crm-table th, .crm-table td { min-width: 100px; padding: 12px 14px; border-bottom: 1px solid var(--line-light); }
+.crm-table th { color: var(--muted-on-light); font-family: "DM Mono", monospace; font-size: 9px; font-weight: 500; text-transform: uppercase; }
+.crm-table td select { max-width: 180px; min-height: 32px; border: 1px solid var(--line-light); background: var(--background-light); color: var(--deep-ocean); font-size: 10px; }
+.crm-pagination { justify-content: space-between; margin: 16px 0 30px; color: var(--muted-on-light); font-size: 10px; }
+.crm-small-button { min-height: 34px; padding: 7px 12px; font-size: 9px; }
+.crm-request-detail { margin-top: 20px; padding: 20px; border: 1px solid var(--line-light); background: var(--background-light); color: var(--deep-ocean); }
+.crm-request-detail > p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.crm-request-actions { margin: 18px 0; }
+.crm-comments { display: grid; gap: 10px; margin-bottom: 18px; }
+.crm-comments article { padding: 12px; border: 1px solid var(--line-light); }
+.crm-comments p { margin: 7px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.crm-comments small { color: var(--muted-on-light); }
+.crm-comment-form { display: grid; justify-items: start; gap: 10px; }
+.crm-comment-form label { color: var(--deep-ocean); font-size: 10px; font-weight: 600; }
+.crm-comment-form textarea { width: 100%; }
+.crm-attachments { display: grid; gap: 8px; margin: 0 0 18px; }
+.crm-attachments article { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid var(--line-light); color: var(--deep-ocean); font-size: 10px; }
 
 /* Legal */
 .legal-section { background: var(--background-light); }
@@ -632,6 +667,8 @@ h1, h2, h3, .brand-name strong { font-family: "Manrope", sans-serif; }
   .hero-bottom { bottom: 18px; font-size: 8px; }
   .hero-bottom span:nth-child(2) { display: none; }
   .intro-layout, .technology-layout, .engineering-layout, .commerce-layout, .future-layout, .split-section, .values-grid, .detail-overview-grid, .careers-layout, .contact-layout, .lead-dashboard-grid { grid-template-columns: 1fr; gap: 38px; }
+  .crm-form-grid { grid-template-columns: 1fr; }
+  .crm-wide-field { grid-column: auto; }
   .intro-section { padding-block: 80px; }
   .intro-copy h2, .technology-copy h2, .engineering-copy h2, .commerce-layout h2, .future-intro h2, .split-section h2, .values-content h2, .careers-layout h2, .contact-intro h2, .detail-overview h2 { font-size: clamp(33px, 8vw, 44px); }
   .intro-visual { margin-right: 15px; }

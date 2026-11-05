@@ -191,7 +191,9 @@ test("rejects oversized payloads and unavailable rate-limit storage", async () =
 
 test("fails closed when the production email or rate-limit configuration is missing", async () => {
   const variableNames = [
-    "RESEND_API_KEY",
+    "SMTP_HOST",
+    "SMTP_USER",
+    "SMTP_PASSWORD",
     "CONTACT_TO_EMAIL",
     "CONTACT_FROM_EMAIL",
     "UPSTASH_REDIS_REST_URL",

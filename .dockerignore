@@ -1,0 +1,13 @@
+.git
+.github
+.githooks
+.env
+.env.*
+!.env.example
+.vercel
+dist
+node_modules
+tests
+docs
+coverage
+npm-debug.log*

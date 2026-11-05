@@ -16,7 +16,9 @@ if (isVercelProduction) {
   const requiredServerVariables = [
     "DATABASE_URL",
     "AUTH_RATE_LIMIT_SECRET",
-    "RESEND_API_KEY",
+    "SMTP_HOST",
+    "SMTP_USER",
+    "SMTP_PASSWORD",
     "CONTACT_TO_EMAIL",
     "CONTACT_FROM_EMAIL",
     "UPSTASH_REDIS_REST_URL",
@@ -55,8 +57,17 @@ if (
 }
 
 if (isVercelProduction) {
-  if (!/^re_[A-Za-z0-9_-]+$/.test(env.RESEND_API_KEY.trim())) {
-    console.error("RESEND_API_KEY has an invalid format.");
+  if (/[\s\r\n]/.test(env.SMTP_HOST.trim())) {
+    console.error("SMTP_HOST must be a hostname without whitespace.");
+    process.exit(1);
+  }
+  if (
+    env.SMTP_PORT?.trim() &&
+    (!/^\d+$/.test(env.SMTP_PORT.trim()) ||
+      Number(env.SMTP_PORT) < 1 ||
+      Number(env.SMTP_PORT) > 65535)
+  ) {
+    console.error("SMTP_PORT must be an integer between 1 and 65535.");
     process.exit(1);
   }
   const emailPattern = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;

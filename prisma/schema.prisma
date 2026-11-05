@@ -41,6 +41,54 @@ enum TaskStatus {
   @@schema("giemens_crm")
 }
 
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+
+  @@schema("giemens_crm")
+}
+
+enum JurivanaRequestType {
+  LEGAL
+  COMPLIANCE
+  PROPERTY_VERIFICATION
+  BUSINESS_REGISTRATION
+
+  @@schema("giemens_crm")
+}
+
+enum JurivanaRequestStatus {
+  SUBMITTED
+  IN_REVIEW
+  NEEDS_INFORMATION
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+
+  @@schema("giemens_crm")
+}
+
+enum DocumentCategory {
+  CLIENT_ATTACHMENT
+  LEGAL
+  COMPLIANCE
+  PROPERTY_VERIFICATION
+  BUSINESS_REGISTRATION
+  PROJECT
+
+  @@schema("giemens_crm")
+}
+
+enum DocumentStatus {
+  PENDING_UPLOAD
+  READY
+
+  @@schema("giemens_crm")
+}
+
 model Role {
   id          String   @id @default(uuid()) @db.Uuid
   name        String   @unique @db.VarChar(60)
@@ -62,6 +110,11 @@ model User {
   role         Role       @relation(fields: [roleId], references: [id], onDelete: Restrict)
   activities   Activity[]
   sessions     Session[]
+  assignedTasks Task[] @relation("TaskAssignee")
+  assignedRequests JurivanaRequest[] @relation("RequestAssignee")
+  requestComments RequestComment[]
+  documents Document[]
+  auditEvents AuditLog[]
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -142,6 +195,7 @@ model Customer {
   leadId    String?   @unique @map("lead_id") @db.Uuid
   lead      Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
   projects  Project[]
+  requests  JurivanaRequest[]
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -156,6 +210,7 @@ model Project {
   description String?   @db.VarChar(5000)
   customerId  String?   @map("customer_id") @db.Uuid
   customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  status      ProjectStatus @default(PLANNED)
   tasks       Task[]
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -169,6 +224,8 @@ model Task {
   id        String     @id @default(uuid()) @db.Uuid
   projectId String?    @map("project_id") @db.Uuid
   project   Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignedToId String? @map("assigned_to_id") @db.Uuid
+  assignedTo User? @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   title     String     @db.VarChar(240)
   details   String?    @db.VarChar(5000)
   status    TaskStatus @default(OPEN)
@@ -177,7 +234,95 @@ model Task {
   updatedAt DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([projectId, status])
+  @@index([assignedToId, status])
   @@index([status, dueAt])
   @@map("tasks")
+  @@schema("giemens_crm")
+}
+
+model JurivanaRequest {
+  id              String                @id @default(uuid()) @db.Uuid
+  customerId      String                @map("customer_id") @db.Uuid
+  customer        Customer              @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  type            JurivanaRequestType
+  status          JurivanaRequestStatus @default(SUBMITTED)
+  title           String                @db.VarChar(240)
+  description     String                @db.VarChar(5000)
+  assignedToId    String?               @map("assigned_to_id") @db.Uuid
+  assignedTo      User?                 @relation("RequestAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  comments        RequestComment[]
+  documents       RequestDocument[]
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([customerId, createdAt])
+  @@index([type, status, createdAt])
+  @@index([assignedToId, status])
+  @@map("jurivana_requests")
+  @@schema("giemens_crm")
+}
+
+model RequestComment {
+  id        String          @id @default(uuid()) @db.Uuid
+  requestId String          @map("request_id") @db.Uuid
+  request   JurivanaRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId    String          @map("user_id") @db.Uuid
+  user      User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  body      String          @db.VarChar(5000)
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([requestId, createdAt])
+  @@map("request_comments")
+  @@schema("giemens_crm")
+}
+
+model Document {
+  id             String          @id @default(uuid()) @db.Uuid
+  fileName       String          @map("file_name") @db.VarChar(255)
+  contentType    String          @map("content_type") @db.VarChar(120)
+  sizeBytes      Int             @map("size_bytes")
+  checksumSha256 String          @map("checksum_sha256") @db.Char(64)
+  storageKey     String          @unique @map("storage_key") @db.VarChar(512)
+  category       DocumentCategory
+  status         DocumentStatus   @default(PENDING_UPLOAD)
+  tags           String[]        @default([])
+  ownerUserId    String          @map("owner_user_id") @db.Uuid
+  owner          User            @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
+  requests       RequestDocument[]
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerUserId, createdAt])
+  @@index([category, createdAt])
+  @@index([status, createdAt])
+  @@map("documents")
+  @@schema("giemens_crm")
+}
+
+model RequestDocument {
+  requestId  String          @map("request_id") @db.Uuid
+  documentId String          @map("document_id") @db.Uuid
+  request    JurivanaRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  document   Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([requestId, documentId])
+  @@index([documentId])
+  @@map("request_documents")
+  @@schema("giemens_crm")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  action      String   @db.VarChar(100)
+  entityType  String   @map("entity_type") @db.VarChar(80)
+  entityId    String?  @map("entity_id") @db.Uuid
+  details     Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@map("audit_logs")
   @@schema("giemens_crm")
 }

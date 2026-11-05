@@ -142,7 +142,7 @@ export function LoginPage() {
       const returnTo = (location.state as { returnTo?: unknown } | null)?.returnTo;
       const safeReturnTo =
         typeof returnTo === "string" &&
-        (returnTo === "/admin" || returnTo === "/admin/leads")
+        /^\/admin(?:\/(?:dashboard|leads|customers|projects|tasks|requests|activities|documents))?$/.test(returnTo)
           ? returnTo
           : "/admin";
       navigate(safeReturnTo, { replace: true });
@@ -196,6 +196,7 @@ export function LoginPage() {
             <button className="button button-primary form-submit" type="submit" disabled={submitting}>
               {submitting ? "Signing in…" : "Sign in"}
             </button>
+            <p>Forgot your password? Contact your system administrator. Self-service reset is not available yet.</p>
           </form>
         </div>
       </section>
@@ -208,6 +209,16 @@ export function AdminHome() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const canManageLeads = leadAccessRoles.includes(user.role);
+  const workspaceLinks = [
+    { label: "Dashboard", to: "/admin/dashboard" },
+    ...(canManageLeads ? [{ label: "Lead management", to: "/admin/leads" }] : []),
+    { label: "Customers", to: "/admin/customers" },
+    { label: "Projects", to: "/admin/projects" },
+    { label: "Tasks", to: "/admin/tasks" },
+    { label: "Jurivana requests", to: "/admin/requests" },
+    ...(leadAccessRoles.includes(user.role) ? [{ label: "Activities", to: "/admin/activities" }] : []),
+    { label: "Documents", to: "/admin/documents" },
+  ];
 
   async function signOut() {
     setError("");
@@ -234,7 +245,9 @@ export function AdminHome() {
             description={`Signed in as ${user.name} · ${user.role.replaceAll("_", " ")}`}
           />
           <div className="auth-actions">
-            {canManageLeads && <Link className="button button-primary" to="/admin/leads">Lead management</Link>}
+            {workspaceLinks.map((item) => (
+              <Link className="button button-primary" to={item.to} key={item.to}>{item.label}</Link>
+            ))}
             <button className="button button-outline" type="button" onClick={signOut}>Sign out</button>
           </div>
           {error && <p className="form-status form-status-error" role="alert">{error}</p>}

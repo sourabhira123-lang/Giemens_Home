@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { Footer, Navbar, PageMeta } from "./components";
 import { LeadDashboard } from "./features/leads/LeadDashboard";
+import { AdminDashboard, CrmWorkspace, DocumentsWorkspace } from "./features/crm/CrmPages";
 import {
   AdminHome,
   LoginPage,
@@ -80,6 +81,13 @@ function ApplicationRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/admin" element={<AdminHome />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/customers" element={<CrmWorkspace resource="customers" />} />
+          <Route path="/admin/projects" element={<CrmWorkspace resource="projects" />} />
+          <Route path="/admin/tasks" element={<CrmWorkspace resource="tasks" />} />
+          <Route path="/admin/requests" element={<CrmWorkspace resource="requests" />} />
+          <Route path="/admin/activities" element={<CrmWorkspace resource="activities" />} />
+          <Route path="/admin/documents" element={<DocumentsWorkspace />} />
           <Route element={<ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]} />}>
             <Route path="/admin/leads" element={<LeadDashboard />} />
           </Route>

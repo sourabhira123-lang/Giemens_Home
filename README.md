@@ -15,6 +15,9 @@ For local PostgreSQL and Prisma setup, follow
 database, replacing the password placeholder locally. Prisma CLI reads `.env`;
 Vite reads `.env.local`. Never commit either file or paste database credentials
 into chat. CRM migrations are scoped to the `giemens_crm` schema.
+Database authentication is currently pending. Do not run migrations or seed
+until valid PostgreSQL credentials are available. See the migration checklist
+in [the deployment guide](./docs/deployment.md).
 For admin login and role permissions, see
 [the authentication guide](./docs/authentication.md).
 
@@ -40,7 +43,7 @@ push a commit. GitHub authentication must be configured for pushes to succeed.
 
 ## Environment variables
 
-Configure these in the Vercel project settings for Preview and Production.
+Configure these in the deployment platform's secret/environment settings.
 Values in the browser must use the `VITE_` prefix; never put API keys in a
 `VITE_` variable.
 
@@ -50,16 +53,22 @@ Values in the browser must use the `VITE_` prefix; never put API keys in a
 | `VITE_CONTACT_ENDPOINT` | Required for production | Must be `/api/contact`. |
 | `DATABASE_URL` | Required for CRM and admin authentication | PostgreSQL connection URL for the `giemens_crm` schema. |
 | `AUTH_RATE_LIMIT_SECRET` | Required for production | Random secret of at least 32 bytes for hashing login rate-limit keys. |
-| `RESEND_API_KEY` | Required | Secret API key from the Resend account. |
+| `SMTP_HOST` | Required | SMTP relay hostname. |
+| `SMTP_PORT` | Optional | SMTP port; defaults to `587` and uses implicit TLS on port `465`. |
+| `SMTP_USER` | Required | SMTP authentication username. |
+| `SMTP_PASSWORD` | Required | SMTP authentication password; keep it in a secret store. |
 | `CONTACT_TO_EMAIL` | Required | Business mailbox that receives inquiries. |
-| `CONTACT_FROM_EMAIL` | Required | Sender address on a domain verified with Resend. |
+| `CONTACT_FROM_EMAIL` | Required | Sender address authorized by the SMTP relay. |
 | `UPSTASH_REDIS_REST_URL` | Required | HTTPS REST URL for the Upstash Redis database used by distributed rate limiting. |
 | `UPSTASH_REDIS_REST_TOKEN` | Required | Secret Upstash REST token. |
+| `TRUST_PROXY_HOPS` | Optional | Number of trusted reverse proxies in front of the Node runtime; leave at `0` unless configured and network-restricted. |
+| `AZURE_STORAGE_ACCOUNT_URL` | Required for document uploads | HTTPS Blob account endpoint; Azure production uses managed identity. |
+| `AZURE_STORAGE_CONTAINER` | Required for document uploads | Private Blob container name (Azure template provisions `documents`). |
 
 The API rejects requests when required secrets are missing, malformed, or its
 rate-limit service is unavailable. It allows five contact attempts per IP per
-15 minutes. Keep the Upstash and Resend credentials server-side in Vercel
-environment settings and rotate them if exposed.
+15 minutes. Keep SMTP and Upstash credentials in the deployment platform's
+secret store and rotate them if exposed.
 
 The project targets Node.js 22.x on Vercel. Its npm `allowScripts` policy
 approves the locked `esbuild` install script required to install esbuild's
@@ -71,6 +80,8 @@ esbuild.
 ```bash
 npm run typecheck
 npm test
+npm run prisma:validate
+npm run prisma:generate
 npm run build
 npm audit
 ```
@@ -80,19 +91,15 @@ HTML entry for every route, and generates `dist/sitemap.xml` plus the sitemap
 directive in `dist/robots.txt` when `VITE_SITE_URL` is configured. A Vercel
 Production build fails if those public URL settings are missing.
 
-## Vercel deployment
+## Deployment
 
-1. Import this project into Vercel and select the Vite framework preset.
-2. Set the environment variables above in the relevant Vercel environments.
-3. Ensure the sender domain is verified in Resend and the Upstash database is
-   active.
-4. Deploy. `vercel.json` configures the Vite output, per-page SPA routes,
-   serverless API function and security headers.
-5. Test direct page loads and refreshes, the contact flow, `robots.txt` and
-   `sitemap.xml` on the deployed domain.
+The repository includes a Docker image that serves the prerendered Vite site
+and the existing `/api/*` handlers from one Node.js process. See
+[the deployment guide](./docs/deployment.md) for Azure, AWS, DigitalOcean, and
+VPS steps. Vercel remains supported via `vercel.json`.
 
-The contact API sends plain-text inquiries via Resend and does not report
-success unless Resend accepts the message. The API also validates request
+The contact API sends plain-text inquiries through the configured SMTP relay
+and does not report success unless delivery is accepted. It validates request
 origin, content type, size, fields, phone/email formats, honeypot and rate
 limits.
 
@@ -100,7 +107,7 @@ limits.
 
 - Confirm the exact legal company name, brand relationship, advertised
   capabilities and whether each listed service is currently available.
-- Supply and verify the actual receiving mailbox and Resend sender identity.
+- Supply and verify the actual receiving mailbox and SMTP sender identity.
 - Have the Privacy Policy, Terms and Disclaimer reviewed for the operating
   jurisdictions, actual data retention/processor practices and applicable
   regulations. Current copy is general website information, not legal advice.
