@@ -56,6 +56,7 @@ Values in the browser must use the `VITE_` prefix; never put API keys in a
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `VITE_SITE_URL` | Required for production | Public site origin, e.g. `https://www.example.com`; used for canonical tags and sitemap URLs. |
+| `VITE_JURIVANA_URL` | Optional | HTTPS origin for the standalone Jurivana application; defaults to `https://jurivana.giemens.com`. |
 | `VITE_CONTACT_ENDPOINT` | Required for production | Must be `/api/contact`. |
 | `DATABASE_URL` | Required for CRM and admin authentication | PostgreSQL connection URL for the `giemens_crm` schema. |
 | `AUTH_RATE_LIMIT_SECRET` | Required for production | Random secret of at least 32 bytes for hashing login rate-limit keys. |

@@ -25,6 +25,7 @@ Set these variables in the platform:
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL URL for the active Prisma schema and `giemens_crm` schema. |
 | `VITE_SITE_URL` | Public HTTPS origin; supplied as a Docker build argument to generate canonical metadata and sitemap URLs. |
+| `VITE_JURIVANA_URL` | Optional standalone Jurivana HTTPS origin, baked into the client build; defaults to `https://jurivana.giemens.com`. |
 | `AUTH_RATE_LIMIT_SECRET` | At least 32 bytes; used to hash login rate-limit keys. |
 | `METRICS_AUTH_TOKEN` | Optional private Prometheus scrape token; at least 32 bytes when set. |
 | `SMTP_PROVIDER` | `custom`, `microsoft365`, `google-workspace`, or `zoho`; defaults to `custom`. |
@@ -125,9 +126,10 @@ access to the container port. The app trusts no proxy headers by default.
 2. The upload API uses an Azure private Blob container, user-delegation SAS
    URLs, type/size/signature/checksum verification, and fail-closed ClamAV
    scanning. Deploy a private ClamAV service reachable as `CLAMAV_HOST` before
-   routing traffic; `/ready` stays unready until PostgreSQL and ClamAV respond.
+   routing traffic. Startup and `/ready` require PostgreSQL, SMTP, Azure Blob,
+   Upstash Redis and ClamAV to respond.
 3. Configure an Azure Container Registry and build/push the image with the
-   public `VITE_SITE_URL` as a build argument.
+   public `VITE_SITE_URL` and standalone `VITE_JURIVANA_URL` as build arguments.
 4. Create a Log Analytics workspace and prepare an untracked, ignored
    `infra/azure/production.parameters.json` file using the parameters described
    in [the Azure template guide](../infra/azure/README.md).

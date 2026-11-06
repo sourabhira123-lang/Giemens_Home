@@ -1,6 +1,5 @@
 import { createConnection } from "node:net";
 import { once } from "node:events";
-import { prisma } from "./prisma.ts";
 import { getQuarantinedBlobStream } from "./azure-blob-storage.ts";
 
 type ScanResult = "clean" | "infected";
@@ -98,16 +97,23 @@ export async function scanUploadedBlob(
   return scanStreamWithClamAv(bytes(), { host, port, maximumBytes });
 }
 
-export async function getDocumentScanReadiness(): Promise<void> {
+export async function checkClamAvReadiness(): Promise<void> {
   const host = process.env.CLAMAV_HOST?.trim();
   const port = Number(process.env.CLAMAV_PORT ?? 3310);
   if (!host) throw new Error("CLAMAV_HOST is not configured.");
-  await prisma.$queryRaw`SELECT 1`;
   const socket = createConnection({ host, port });
   socket.setTimeout(2_000);
-  try {
-    await once(socket, "connect");
-  } finally {
-    socket.destroy();
-  }
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      if (error) reject(error);
+      else resolve();
+    };
+    socket.once("connect", () => finish());
+    socket.once("timeout", () => finish(new Error("ClamAV readiness timed out.")));
+    socket.once("error", finish);
+  });
 }

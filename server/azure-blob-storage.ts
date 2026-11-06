@@ -43,6 +43,13 @@ function getServiceClient(config: ReturnType<typeof getStorageConfig>) {
   return serviceClient;
 }
 
+export async function checkBlobStorageReadiness(): Promise<void> {
+  const config = getStorageConfig();
+  await getServiceClient(config)
+    .getContainerClient(config.containerName)
+    .getProperties();
+}
+
 async function createBlobSas(
   blobName: string,
   permissions: string,

@@ -349,6 +349,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
                 scheme: 'HTTP'
               }
               initialDelaySeconds: 10
+              failureThreshold: 10
               periodSeconds: 10
               timeoutSeconds: 3
             }

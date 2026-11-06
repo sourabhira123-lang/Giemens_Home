@@ -23,7 +23,8 @@ paths relative to its module and does not require a Windows host path.
    ```sh
    docker build \
      --build-arg VITE_SITE_URL=https://www.giemens.com \
-     --tag giemens-home:<immutable-release-tag> .
+      --build-arg VITE_JURIVANA_URL=https://jurivana.giemens.com \
+      --tag giemens-home:<immutable-release-tag> .
    ```
 
 3. Provide runtime settings through a root-owned secret store or a protected
@@ -38,8 +39,9 @@ paths relative to its module and does not require a Windows host path.
    permits it. The current app does not require a writable persistent local
    volume.
 6. Configure startup/liveness to `/liveness`, readiness to `/ready`, and retain
-   `/healthz` for backward compatibility. Do not send customer traffic until
-   readiness succeeds.
+   `/healthz` for backward compatibility. Startup validates PostgreSQL, SMTP,
+   Blob, Redis and ClamAV; do not send customer traffic until readiness
+   succeeds.
 7. Deploy database migrations as a separate, one-shot release operation with
    a least-privilege migration identity. Do not run migrations independently
    from every replica startup.

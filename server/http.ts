@@ -12,7 +12,10 @@ import logoutHandler from "../api/auth/logout.ts";
 import sessionHandler from "../api/auth/session.ts";
 import crmHandler from "../api/crm.ts";
 import documentsHandler from "../api/documents.ts";
-import { getDocumentScanReadiness } from "./clamav.ts";
+import {
+  checkApplicationReadiness,
+  DependencyReadinessError,
+} from "./readiness.ts";
 import {
   logEvent,
   recordHttpRequest,
@@ -307,13 +310,16 @@ export function createHttpServer(options?: {
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("Content-Type", "text/plain; charset=utf-8");
         try {
-          await (options?.checkReadiness ?? getDocumentScanReadiness)();
+          await (options?.checkReadiness ?? checkApplicationReadiness)();
           response.statusCode = 200;
           response.end(request.method === "HEAD" ? undefined : "ready");
         } catch (error) {
           logEvent("error", "readiness.failed", {
             requestId,
             error: error instanceof Error ? error.name : "UnknownError",
+            ...(error instanceof DependencyReadinessError
+              ? { dependencies: error.dependencies.join(",") }
+              : {}),
           });
           response.statusCode = 503;
           response.end(request.method === "HEAD" ? undefined : "not ready");
@@ -346,10 +352,23 @@ export function createHttpServer(options?: {
   });
 }
 
-function startServer(): void {
+async function startServer(): Promise<void> {
   const port = Number(process.env.PORT ?? 3000);
   const host = process.env.HOST ?? "0.0.0.0";
   const trustedProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 0);
+  try {
+    await checkApplicationReadiness();
+  } catch (error) {
+    recordStartup("error");
+    logEvent("error", "application.start.failed", {
+      error: error instanceof Error ? error.name : "UnknownError",
+      ...(error instanceof DependencyReadinessError
+        ? { dependencies: error.dependencies.join(",") }
+        : {}),
+    });
+    process.exitCode = 1;
+    return;
+  }
   const server = createHttpServer({ trustedProxyHops });
   server.requestTimeout = 30_000;
   server.headersTimeout = 10_000;

@@ -24,8 +24,10 @@ The template sets `AZURE_CLIENT_ID` to the user-assigned identity so
   configured host/port for malware scanning and includes it in `/ready`; never
   expose TCP 3310 to public networks.
 
-Build and push the image using the repository's Dockerfile and `VITE_SITE_URL`
-build argument. Do not pass runtime secrets as Docker build arguments.
+Build and push the image using the repository's Dockerfile with
+`VITE_SITE_URL` and `VITE_JURIVANA_URL` build arguments. The Jurivana URL
+defaults to `https://jurivana.giemens.com` and must identify the standalone
+application. Do not pass runtime secrets as Docker build arguments.
 
 Create a parameter file outside version control. The `databaseUrl`,
 `authRateLimitSecret`, `metricsAuthToken`, `smtpUser`, `smtpPassword`, and

@@ -29,12 +29,7 @@ import {
   Reveal,
   SectionHeading,
 } from "./components";
-import {
-  jurivanaAiFeatures,
-  jurivanaBenefits,
-  jurivanaServices,
-} from "./services/ecosystem";
-import { futureAiServices } from "./services/future-ai";
+import { jurivanaServices } from "./services/ecosystem";
 import {
   getBusinessDivision,
   getCategoryForDivision,
@@ -715,6 +710,8 @@ export function DetailPage({ path }: { path: string }) {
 }
 
 export function JurivanaPage() {
+  const jurivanaUrl =
+    import.meta.env.VITE_JURIVANA_URL?.trim() || "https://jurivana.giemens.com";
   return (
     <>
       <PageMeta {...(pageMeta["/ecosystem/jurivana"] ?? pageMeta["/jurivana"])} />
@@ -729,34 +726,38 @@ export function JurivanaPage() {
         <div className="container page-hero-content">
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Business ecosystem", to: "/businesses" }, { label: "Jurivana" }]} />
           <Reveal>
-            <span className="eyebrow">GIEMENS specialized brand</span>
+            <span className="eyebrow">Independent Jurivana platform</span>
             <h1>Jurivana</h1>
             <p className="hero-tagline">Legal. Property. Compliance.</p>
             <p>
-              Integrated legal, compliance, property verification and business support platform powered by technology and intelligent automation.
+              A standalone client platform for legal services, property support,
+              compliance and business registration.
             </p>
           </Reveal>
           <div className="jurivana-hero-actions">
-            <Link className="button button-primary" to="/contact?division=Jurivana&source=jurivana_inquiry">Get Started <ArrowRight size={17} /></Link>
-            <Link className="button button-ghost" to="/contact?division=Jurivana&source=consultation_request">Book Consultation <ArrowDownRight size={17} /></Link>
-            <Link className="button button-ghost" to="#jurivana-services">Learn More</Link>
+            <a className="button button-primary" href={jurivanaUrl}>Launch Jurivana <ArrowRight size={17} /></a>
+            <a className="button button-ghost" href={jurivanaUrl}>Login To Jurivana <ArrowUpRight size={17} /></a>
+            <a className="button button-ghost" href={jurivanaUrl}>Request Demo <ArrowDownRight size={17} /></a>
           </div>
         </div>
-        <span className="page-hero-index" aria-hidden="true">GIEMENS / JURIVANA</span>
+        <span className="page-hero-index" aria-hidden="true">JURIVANA / CLIENT PLATFORM</span>
       </section>
 
       <section className="section jurivana-intro" id="jurivana-services">
         <div className="container detail-overview-grid">
           <Reveal>
-            <span className="eyebrow">Jurivana support</span>
-            <h2>Legal confidence,<br /><span>property clarity.</span></h2>
+            <span className="eyebrow">Jurivana overview</span>
+            <h2>Services and workflows,<br /><span>in one client portal.</span></h2>
           </Reveal>
           <Reveal delay={0.1}>
             <p className="lead">
-              Jurivana brings legal, compliance, documentation and property support into one connected experience to help businesses and individuals move forward with more confidence.
+              Jurivana operates as a separate application for clients to access
+              services, manage requests, follow workflows and organize documents.
             </p>
             <p>
-              The platform is designed to simplify administrative workflows, increase visibility and provide a more organized path from inquiry to action. Qualified legal and specialist advice remains subject to the relevant professional and jurisdictional requirements.
+              Use the buttons above to open the Jurivana platform. Service scope
+              and availability depend on the matter and applicable professional
+              and jurisdictional requirements.
             </p>
           </Reveal>
         </div>
@@ -766,8 +767,8 @@ export function JurivanaPage() {
         <div className="container">
           <SectionHeading
             eyebrow="Services"
-            title="Support across the full legal and compliance journey."
-            description="A structured set of business support services covering essential documentation, property diligence and compliance continuity."
+            title="A clear overview of Jurivana services."
+            description="The independent Jurivana team supports clients across legal, property, compliance and business registration workflows."
             light
           />
           <div className="capability-grid jurivana-service-grid">
@@ -783,87 +784,12 @@ export function JurivanaPage() {
         </div>
       </section>
 
-      <section className="section jurivana-ai-section">
-        <div className="container">
-          <SectionHeading
-            eyebrow="AI powered features"
-            title="Intelligence built into the workflow."
-            description="A practical layer of automation designed to reduce friction, improve visibility and support faster decision-making."
-            align="center"
-          />
-          <div className="feature-grid">
-            {jurivanaAiFeatures.map((feature, index) => (
-              <Reveal className="feature-card" key={feature.title} delay={(index % 3) * 0.04}>
-                <span className="feature-index">0{index + 1}</span>
-                <h3>{feature.title}</h3>
-                <p>{feature.description}</p>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section jurivana-benefits">
-        <div className="container">
-          <SectionHeading
-            eyebrow="Why Jurivana"
-            title="Designed for clarity, speed and confidence."
-            description="Practical tools and support layers that help teams handle important processes without losing visibility or momentum."
-          />
-          <div className="benefit-grid">
-            {jurivanaBenefits.map((benefit, index) => (
-              <Reveal className="benefit-card" key={benefit} delay={(index % 3) * 0.04}>
-                <span className="benefit-number">0{index + 1}</span>
-                <h3>{benefit}</h3>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section future-ecosystem-section">
-        <div className="container">
-          <SectionHeading
-            eyebrow="Future-ready ecosystem"
-            title="Built for the next phase of connected operations."
-            description="The platform is prepared for future integrations with CRM, ERP, AI receptionist, proposal generation and executive reporting layers."
-            align="center"
-          />
-          <div className="future-grid">
-            {futureAiServices.map((service, index) => (
-              <Reveal className="future-card" key={service.name} delay={(index % 4) * 0.04}>
-                <div className="future-card-header">
-                  <span>{service.name}</span>
-                  <strong>{service.status}</strong>
-                </div>
-                <p>{service.purpose}</p>
-                <small>{service.endpoint}</small>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section jurivana-cta">
-        <div className="container jurivana-cta-inner">
-          <div>
-            <span className="eyebrow">Need legal or compliance support?</span>
-            <h2>Start Your Jurivana Journey</h2>
-          </div>
-          <div className="jurivana-cta-actions">
-            <Link className="button button-primary" to="/contact?division=Jurivana&source=jurivana_inquiry">Get Started</Link>
-            <Link className="button button-ghost" to="/businesses">Explore ecosystem</Link>
-          </div>
-        </div>
-      </section>
-
       <div className="jurivana-disclaimer container">
         <ShieldCheck size={20} />
         <p>
           <strong>Important:</strong> Jurivana is not represented here as a law firm and does not claim to provide legal representation. Service scope and availability depend on the specific matter and applicable professional guidance.
         </p>
       </div>
-      <CTASection title="Need help navigating a process?" description="Tell us what you are working through. Our team can help identify the right next conversation." secondaryPath="/services" contactPath="/contact?division=Jurivana&source=jurivana_inquiry" />
     </>
   );
 }

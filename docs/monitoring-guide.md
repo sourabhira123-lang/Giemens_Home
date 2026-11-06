@@ -80,9 +80,9 @@ approved policy.
 
 - `/liveness` and compatibility route `/healthz` indicate only that the HTTP
   process can answer requests. They must not depend on PostgreSQL or Redis.
-- `/ready` performs a PostgreSQL `SELECT 1` and checks TCP reachability of the
-  private ClamAV daemon; a 503 removes the instance from traffic. It is not a
-  migration or full dependency test.
+- Startup and `/ready` check PostgreSQL, SMTP, Azure Blob container access,
+  Upstash Redis and private ClamAV TCP reachability. A failure prevents startup
+  or returns 503 for readiness; it is not a migration or data-integrity test.
 - `/health` is a liveness alias for operators and generic load balancers.
 - `/metrics` returns Prometheus text only when `METRICS_AUTH_TOKEN` is set and
   the caller presents the configured Bearer token. Keep it on a private

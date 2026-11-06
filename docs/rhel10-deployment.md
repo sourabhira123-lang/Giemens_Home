@@ -24,7 +24,8 @@ RHEL 10 run.
    file outside the Git checkout. Keep secrets out of systemd unit arguments
    and logs.
 6. Configure the orchestrator to use `/liveness` for startup/liveness and
-   `/ready` for readiness. Configure the readiness network path to PostgreSQL.
+   `/ready` for readiness. Permit the app's required private egress to
+   PostgreSQL, SMTP, Blob, Redis and ClamAV.
 7. Set `TRUST_PROXY_HOPS` to the verified proxy topology, not a guessed value.
 
 ## Acceptance commands

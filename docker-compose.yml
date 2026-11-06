@@ -4,6 +4,7 @@ services:
       context: .
       args:
         VITE_SITE_URL: ${VITE_SITE_URL:?Set VITE_SITE_URL to the public HTTPS origin}
+        VITE_JURIVANA_URL: ${VITE_JURIVANA_URL:-https://jurivana.giemens.com}
     image: giemens-home:local
     restart: unless-stopped
     init: true

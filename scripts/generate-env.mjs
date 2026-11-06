@@ -4,12 +4,12 @@ import { writeFile } from "node:fs/promises";
 const targets = [
   {
     file: ".env.development",
-    siteUrl: "https://jurivana.example",
+    siteUrl: "http://localhost:5173",
     databaseHost: "127.0.0.1",
   },
   {
     file: ".env.production",
-    siteUrl: "https://jurivana.example",
+    siteUrl: "https://www.giemens.com",
     databaseHost: "postgres.example.com",
   },
 ];
@@ -21,6 +21,7 @@ function randomSecret() {
 for (const target of targets) {
   const contents = [
     `VITE_SITE_URL=${target.siteUrl}`,
+    "VITE_JURIVANA_URL=https://jurivana.giemens.com",
     "VITE_CONTACT_ENDPOINT=/api/contact",
     `DATABASE_URL="postgresql://giemens_app:REPLACE_URL_ENCODED_PASSWORD@${target.databaseHost}:5432/giemens?schema=giemens_crm"`,
     "ADMIN_EMAIL=admin@giemens.local",

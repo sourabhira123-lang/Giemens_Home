@@ -5,6 +5,11 @@
 **Assessment date:** 2026-11-07
 **Decision:** **NOT READY FOR PRODUCTION**
 
+> The dated implementation notes below are superseded for current release
+> evidence by [GO_LIVE_CERTIFICATION.md](./GO_LIVE_CERTIFICATION.md) and
+> [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md), including the verified
+> local seed and the latest migration ownership failure.
+
 ## Executive readiness summary
 
 The existing Vite, React, TypeScript, Node.js, PostgreSQL, Prisma, Docker, and
@@ -129,7 +134,8 @@ compliance rating.
 4. **Exact code changes:** Added one-shot generation that refuses overwrites,
    32-byte random secrets, SMTP provider selection, ClamAV/retention settings,
    and OTLP/metrics settings. Runtime validation rejects placeholder values.
-5. **Environment variables:** `VITE_SITE_URL`, `VITE_CONTACT_ENDPOINT`,
+5. **Environment variables:** `VITE_SITE_URL`, `VITE_JURIVANA_URL`,
+   `VITE_CONTACT_ENDPOINT`,
    `DATABASE_URL`, `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD`,
    `AUTH_RATE_LIMIT_SECRET`, `METRICS_AUTH_TOKEN`, `SMTP_PROVIDER`, `SMTP_HOST`,
    `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `CONTACT_TO_EMAIL`,
@@ -175,7 +181,7 @@ compliance rating.
    remains; cleanup and email health scripts are copied into the runtime image.
    No Docker engine setting can be changed safely from this workspace.
 5. **Environment variables:** Use the complete Blocker 2 set; replace
-   `VITE_SITE_URL`, `DATABASE_URL`, SMTP/Redis/Blob/ClamAV values, and
+   `VITE_SITE_URL`, `VITE_JURIVANA_URL`, `DATABASE_URL`, SMTP/Redis/Blob/ClamAV values, and
    `AUTH_RATE_LIMIT_SECRET` with valid environment-specific values.
 6. **Validation commands (Windows PowerShell):**
 
@@ -209,36 +215,42 @@ compliance rating.
 
 7. **Expected output:** `docker info` prints `linux`; build succeeds; container
    is running; `/liveness` is HTTP 200
-   with `ok`; `/ready` is HTTP 200 with `ready` only when PostgreSQL and ClamAV
-   are reachable. Verify graceful stop with `docker compose down` after the
+   with `ok`; `/ready` is HTTP 200 with `ready` only when PostgreSQL, SMTP,
+   Blob, Redis and ClamAV are reachable. Verify graceful stop with
+   `docker compose down` after the
    smoke test.
 8. **Rollback:** `docker compose down`; restore the previously deployed image
    digest. Do not prune volumes or images as part of rollback.
 9. **Production impact:** No release image can be certified until build/start
    and health probes pass on a working Linux engine.
 10. **Readiness improvement:** The container remains non-root, uses a
-   liveness-only Docker health check, and now blocks readiness on required
-   database/scanner dependencies.
+   liveness-only Docker health check, and requires database, SMTP, Blob,
+   Redis, and scanner checks at startup and readiness.
 
 ## Blocker 4 — Health, readiness, liveness, and dependency checks
 
-1. **Root cause:** Health routes existed, but readiness previously only checked
-   PostgreSQL and did not verify the required malware scanner dependency.
+1. **Root cause:** Health routes existed, but production readiness did not
+   validate all required external service dependencies.
 2. **Current status:** `/health`, `/healthz`, `/liveness`, and `/ready` are
-   implemented and covered by HTTP tests. `/ready` now checks PostgreSQL
-   `SELECT 1` and private ClamAV TCP reachability. Startup environment
-   validation rejects missing/placeholder production dependencies. Live
-   database/scanner probes remain unverified.
-3. **Exact files:** `server/http.ts`, `server/clamav.ts`,
-   `scripts/validate-runtime-env.mjs`, `Dockerfile`, `infra/azure/main.bicep`,
-   `tests/http.test.ts`.
+   implemented. Startup and `/ready` now check PostgreSQL, SMTP, Azure Blob
+   container access, Upstash Redis and ClamAV. Unit tests cover readiness
+   orchestration and HTTP response behavior. Live service probes remain
+   unverified.
+3. **Exact files:** `server/http.ts`, `server/readiness.ts`,
+   `server/clamav.ts`, `server/azure-blob-storage.ts`,
+   `scripts/validate-runtime-env.mjs`, `Dockerfile`,
+   `infra/azure/main.bicep`, `tests/http.test.ts`,
+   `tests/readiness.test.ts`.
 4. **Exact code changes:** Health routes run before API body parsing;
-   liveness does not depend on external services; readiness returns only
-   `ready`/`not ready` and HTTP 200/503. Health responses use no-store and
-   security headers. Request IDs and safe error names are logged; secrets and
-   dependency details are not returned.
-5. **Environment variables:** `DATABASE_URL`, `CLAMAV_HOST`, `CLAMAV_PORT`,
-   `PORT`, `HOST`, `TRUST_PROXY_HOPS`.
+   liveness does not depend on external services; startup exits nonzero when
+   any required dependency check fails; readiness returns only `ready`/
+   `not ready` and HTTP 200/503. Logs identify failed dependency names but do
+   not include provider error details or secrets.
+5. **Environment variables:** `DATABASE_URL`, `SMTP_PROVIDER`, `SMTP_HOST`,
+   `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `AZURE_STORAGE_ACCOUNT_URL`,
+   `AZURE_STORAGE_CONTAINER`, `UPSTASH_REDIS_REST_URL`,
+   `UPSTASH_REDIS_REST_TOKEN`, `CLAMAV_HOST`, `CLAMAV_PORT`, `PORT`, `HOST`,
+   `TRUST_PROXY_HOPS`.
 6. **Validation commands:**
 
    ```powershell
@@ -249,8 +261,9 @@ compliance rating.
    ```
 
 7. **Expected output:** Unit/integration tests pass. `/health` and `/liveness`
-   return `200 ok`; `/ready` returns `200 ready` when both dependencies are
-   healthy or `503 not ready` otherwise.
+   return `200 ok`; `/ready` returns `200 ready` only when all five
+   dependencies are healthy or `503 not ready` otherwise. Startup validates
+   them before binding the listener.
 8. **Rollback:** Revert the `/ready` ClamAV dependency only if document uploads
    are disabled before traffic is directed to the reverted release. Keep
    liveness independent of dependency outages.
@@ -599,7 +612,8 @@ compliance rating.
    protected CRM and document routes return 401; invalid payloads return 400;
    oversized bodies return 413; rate-limited requests return 429; secrets and
    raw exception messages never appear in responses/logs. Start requires valid
-   non-placeholder configuration; readiness requires PostgreSQL/ClamAV.
+   non-placeholder configuration; readiness requires PostgreSQL, SMTP, Blob,
+   Redis and ClamAV.
    Production dependency audit must have no unresolved high/critical findings,
    or an approved, documented risk exception with verified runtime reachability.
 8. **Rollback:** Revert the specific application release to a known-good image.

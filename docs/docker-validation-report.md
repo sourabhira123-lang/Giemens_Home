@@ -5,6 +5,12 @@
 **Scope:** Dockerfile, Compose configuration, runtime startup, health endpoints
 **Application code changed:** No
 
+> Historical snapshot from 2026-11-05. The current health/readiness behavior
+> and certification evidence are maintained in
+> [GO_LIVE_CERTIFICATION.md](./GO_LIVE_CERTIFICATION.md). As of 2026-11-07,
+> startup and `/ready` check PostgreSQL, SMTP, Azure Blob, Redis and ClamAV;
+> no live external-service readiness is certified.
+
 ## Result summary
 
 | Check | Result | Evidence |
@@ -41,7 +47,8 @@ explicit health routes.
 ## Dockerfile and Compose review notes
 
 - Dockerfile uses a Node 22 Debian slim image, separate build/runtime dependency
-  stages, Prisma Client generation, a required `VITE_SITE_URL` build argument,
+  stages, Prisma Client generation, `VITE_SITE_URL` and
+  `VITE_JURIVANA_URL` build arguments,
   a non-root `node` runtime user, and a `/liveness` Docker healthcheck. The
   existing `/healthz` route remains for compatibility.
 - Compose uses `init`, a restart policy, loopback-only port binding,

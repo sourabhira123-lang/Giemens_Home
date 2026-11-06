@@ -73,6 +73,26 @@ if (env.VITE_SITE_URL?.trim()) {
   }
 }
 
+if (env.VITE_JURIVANA_URL?.trim()) {
+  try {
+    const url = new URL(env.VITE_JURIVANA_URL.trim());
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.pathname !== "/" ||
+      url.search ||
+      url.hash ||
+      /replace(?:[-_ ]?with)?|example\.com|\.example\b/i.test(url.hostname)
+    ) {
+      throw new Error();
+    }
+  } catch {
+    console.error("VITE_JURIVANA_URL must be a non-placeholder HTTPS origin without credentials or a path.");
+    process.exit(1);
+  }
+}
+
 if (
   env.VITE_CONTACT_ENDPOINT?.trim() &&
   env.VITE_CONTACT_ENDPOINT.trim() !== "/api/contact"
