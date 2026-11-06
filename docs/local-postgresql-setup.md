@@ -7,6 +7,12 @@ See [PostgreSQL connection troubleshooting](./postgresql-troubleshooting.md)
 for the local environment findings, pgAdmin password recovery steps, and
 verification scripts.
 
+The 2026-11-06 readiness audit received Prisma P1000 authentication failure
+from the current `.env` credentials. A previous 2026-11-05 report recorded the
+migrations as applied, but that database state is not currently verifiable.
+Do not treat the historical result as current until the connection checks
+succeed.
+
 ## 1. Configure local environment
 
 Keep `.env` and `.env.local` out of Git. `.env.example` is the committed
@@ -81,9 +87,10 @@ npm run db:deploy
 This runs `prisma migrate deploy` and applies only checked-in migrations. It
 does not generate a migration or reset the database.
 
-The currently inspected local database has all three checked-in migrations
-applied and all 14 expected tables verified. No seed was run. On that database,
-`npm run db:deploy` should report that the schema is up to date.
+The historical 2026-11-05 inspection recorded all three checked-in migrations
+applied and all 14 expected tables verified; no seed was run. The current
+configured credentials fail with P1000, so verify the target and current state
+before applying migrations or seeding.
 
 ## 5. Seed development roles and admin record
 

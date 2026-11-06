@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../server/password.ts";
+import { readAdminSeedConfig } from "../server/seed-config.ts";
 
 const prisma = new PrismaClient();
 
@@ -11,22 +12,9 @@ const roles = [
 ] as const;
 
 async function main() {
-  const adminEmail = (process.env.ADMIN_EMAIL ?? "admin@giemens.local")
-    .trim()
-    .toLowerCase();
-  const adminName = (process.env.ADMIN_NAME ?? "GIEMENS Local Admin").trim();
-  const adminPassword = process.env.ADMIN_PASSWORD ?? "";
-
-  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(adminEmail)) {
-    throw new Error("ADMIN_EMAIL must be a valid email address.");
-  }
-  if (!adminName || adminName.length > 120) {
-    throw new Error("ADMIN_NAME must be between 1 and 120 characters.");
-  }
-  if (adminPassword.length < 12 || Buffer.byteLength(adminPassword, "utf8") > 128) {
-    throw new Error("Set ADMIN_PASSWORD to a unique password between 12 and 128 UTF-8 bytes.");
-  }
-  const passwordHash = await hashPassword(adminPassword);
+  const { email: adminEmail, name: adminName, password } =
+    readAdminSeedConfig(process.env);
+  const passwordHash = await hashPassword(password);
 
   for (const [name, description] of roles) {
     await prisma.role.upsert({

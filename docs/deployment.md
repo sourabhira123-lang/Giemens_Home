@@ -26,11 +26,17 @@ Set these variables in the platform:
 | `DATABASE_URL` | PostgreSQL URL for the active Prisma schema and `giemens_crm` schema. |
 | `VITE_SITE_URL` | Public HTTPS origin; supplied as a Docker build argument to generate canonical metadata and sitemap URLs. |
 | `AUTH_RATE_LIMIT_SECRET` | At least 32 bytes; used to hash login rate-limit keys. |
-| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` | SMTP relay connection/authentication. |
+| `METRICS_AUTH_TOKEN` | Optional private Prometheus scrape token; at least 32 bytes when set. |
+| `SMTP_PROVIDER` | `custom`, `microsoft365`, `google-workspace`, or `zoho`; defaults to `custom`. |
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` | SMTP relay connection/authentication. Host defaults are available for the named providers; use credentials approved by the provider. |
 | `SMTP_PORT` | Optional; defaults to `587`. Port `465` uses implicit TLS. |
 | `CONTACT_TO_EMAIL`, `CONTACT_FROM_EMAIL` | Real inbox and SMTP-authorized sender. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | HTTPS Upstash REST credentials for contact/lead rate limits. |
 | `AZURE_STORAGE_ACCOUNT_URL`, `AZURE_STORAGE_CONTAINER` | Private Blob account endpoint and container for document upload/download SAS URLs. The Azure template provisions the container and managed identity permissions. |
+| `CLAMAV_HOST`, `CLAMAV_PORT` | Private ClamAV daemon reachable by the application; TCP 3310 by default. Readiness fails closed if it cannot be reached. |
+| `DOCUMENT_PENDING_RETENTION_HOURS`, `DOCUMENT_REJECTED_RETENTION_DAYS` | Cleanup policy for abandoned uploads and rejected quarantine objects; defaults are 24 hours and 30 days. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Optional OTLP/HTTP collector base URL. OTLP export is disabled when unset. |
+| `OTEL_EXPORTER_OTLP_HEADERS` | Optional collector authentication headers; keep in the platform secret store. |
 | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Optional service-principal credentials for hosts without workload/user-assigned identity. Store them as secrets; Azure Container Apps uses its managed identity instead. |
 | `TRUST_PROXY_HOPS` | Number of trusted reverse proxies; keep at `0` unless requests can only reach the app through that proxy chain. |
 
@@ -87,13 +93,24 @@ production. Do not run `prisma migrate dev` against production.
 
 ## Container build and local run
 
-Copy `.env.example` to `.env`, set the required variables, and then run:
+Generate ignored local development/production env files, replace all `REPLACE_*`
+and example endpoints with real platform values, then validate Compose:
 
 ```powershell
-docker compose build
-docker compose up -d
-Invoke-WebRequest http://localhost:3000/healthz
+npm run env:generate
+docker compose --env-file .env.development config --quiet
+docker compose --env-file .env.development build
+docker compose --env-file .env.development up -d
+Invoke-WebRequest http://localhost:3000/liveness
+Invoke-WebRequest http://localhost:3000/ready
 ```
+
+The generated files contain fresh local `ADMIN_PASSWORD`,
+`AUTH_RATE_LIMIT_SECRET`, and `METRICS_AUTH_TOKEN` values, but example
+database/provider endpoints and placeholder credentials. They are ignored by
+Git. Do not use the generated production file as real production secrets.
+Run `npm run seed:development` only after replacing its database URL and
+reviewing the local bootstrap account settings.
 
 The Compose port is bound to loopback by default. Put a TLS-terminating reverse
 proxy or a managed ingress in front of it. If that proxy is trusted to set
@@ -105,9 +122,10 @@ access to the container port. The app trusts no proxy headers by default.
 1. Create Azure Database for PostgreSQL Flexible Server with private networking
    where available. Create/authorize a dedicated app principal and database
    credentials; do not use a superuser for the application.
-2. Create an Azure Storage account and private Blob container for future
-   document storage. The current repository has document contracts only; it
-   does not yet include a Blob adapter or upload API.
+2. The upload API uses an Azure private Blob container, user-delegation SAS
+   URLs, type/size/signature/checksum verification, and fail-closed ClamAV
+   scanning. Deploy a private ClamAV service reachable as `CLAMAV_HOST` before
+   routing traffic; `/ready` stays unready until PostgreSQL and ClamAV respond.
 3. Configure an Azure Container Registry and build/push the image with the
    public `VITE_SITE_URL` as a build argument.
 4. Create a Log Analytics workspace and prepare an untracked, ignored

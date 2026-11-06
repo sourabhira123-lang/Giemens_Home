@@ -20,13 +20,18 @@ The template sets `AZURE_CLIENT_ID` to the user-assigned identity so
 - A pushed, immutable app image.
 - PostgreSQL with the active migrations applied, Upstash Redis, SMTP and
   approved application secrets.
+- A private ClamAV daemon reachable from Container Apps. The app uses its
+  configured host/port for malware scanning and includes it in `/ready`; never
+  expose TCP 3310 to public networks.
 
 Build and push the image using the repository's Dockerfile and `VITE_SITE_URL`
 build argument. Do not pass runtime secrets as Docker build arguments.
 
 Create a parameter file outside version control. The `databaseUrl`,
-`authRateLimitSecret`, `smtpUser`, `smtpPassword`, and `redisRestToken`
-parameters are secure inputs. Never commit a populated parameters file.
+`authRateLimitSecret`, `metricsAuthToken`, `smtpUser`, `smtpPassword`, and
+`redisRestToken` parameters are secure inputs. Set `clamavHost` to the private
+daemon hostname and optionally set `otelExporterOtlpEndpoint` to the private
+collector. Never commit a populated parameters file.
 
 ```powershell
 az deployment group create `
@@ -46,5 +51,8 @@ content length, content type, and SHA-256 checksum before marking metadata
 ready. Download URLs are short-lived and force attachment disposition. The
 container is private; never add public access.
 
-The current upload pipeline does not perform malware scanning. Add a scanning
-and quarantine step before production use with arbitrary external files.
+The application keeps unscanned uploads inaccessible in `PENDING_UPLOAD`,
+marks clean files `READY` only after ClamAV succeeds, and marks detected files
+`REJECTED`. Schedule `npm run documents:cleanup` in a protected job using the
+app's database and Blob identity. `READY` documents are not automatically
+deleted; apply approved legal retention policies separately.

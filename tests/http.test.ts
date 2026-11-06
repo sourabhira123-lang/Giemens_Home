@@ -12,7 +12,15 @@ test("container HTTP server serves health, prerendered pages, and safe API error
   await mkdir(distDirectory);
   await writeFile(join(distDirectory, "index.html"), "<main>GIEMENS</main>");
 
-  const server = createHttpServer({ distDirectory });
+  let ready = true;
+  const server = createHttpServer({
+    distDirectory,
+    checkReadiness: async () => {
+      if (!ready) throw new Error("database unavailable");
+    },
+  });
+  const previousMetricsToken = process.env.METRICS_AUTH_TOKEN;
+  process.env.METRICS_AUTH_TOKEN = "test-metrics-token-32-characters-long";
   try {
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);
@@ -24,6 +32,24 @@ test("container HTTP server serves health, prerendered pages, and safe API error
     const health = await fetch(`${origin}/healthz`);
     assert.equal(health.status, 200);
     assert.equal(await health.text(), "ok");
+    assert.ok(health.headers.get("x-request-id"));
+    assert.ok(health.headers.get("x-content-type-options"));
+
+    for (const path of ["/health", "/liveness"]) {
+      const response = await fetch(`${origin}${path}`);
+      assert.equal(response.status, 200);
+      assert.equal(await response.text(), "ok");
+    }
+
+    const readiness = await fetch(`${origin}/ready`);
+    assert.equal(readiness.status, 200);
+    assert.equal(await readiness.text(), "ready");
+    const invalidProbeMethod = await fetch(`${origin}/ready`, { method: "POST" });
+    assert.equal(invalidProbeMethod.status, 405);
+    ready = false;
+    const unavailable = await fetch(`${origin}/ready`);
+    assert.equal(unavailable.status, 503);
+    assert.equal(await unavailable.text(), "not ready");
 
     const route = await fetch(`${origin}/admin/dashboard`);
     assert.equal(route.status, 200);
@@ -45,9 +71,20 @@ test("container HTTP server serves health, prerendered pages, and safe API error
 
     const traversal = await fetch(`${origin}/%2e%2e%2f.env`);
     assert.equal(traversal.status, 404);
+
+    const hiddenMetrics = await fetch(`${origin}/metrics`);
+    assert.equal(hiddenMetrics.status, 404);
+    const metrics = await fetch(`${origin}/metrics`, {
+      headers: { authorization: `Bearer ${process.env.METRICS_AUTH_TOKEN}` },
+    });
+    assert.equal(metrics.status, 200);
+    assert.match(metrics.headers.get("content-type") ?? "", /text\/plain/);
+    assert.match(await metrics.text(), /http_server_requests_total/);
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    if (previousMetricsToken === undefined) delete process.env.METRICS_AUTH_TOKEN;
+    else process.env.METRICS_AUTH_TOKEN = previousMetricsToken;
     await rm(directory, { recursive: true, force: true });
   }
 });

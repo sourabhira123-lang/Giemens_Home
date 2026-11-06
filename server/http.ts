@@ -1,6 +1,7 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
 import { extname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +12,14 @@ import logoutHandler from "../api/auth/logout.ts";
 import sessionHandler from "../api/auth/session.ts";
 import crmHandler from "../api/crm.ts";
 import documentsHandler from "../api/documents.ts";
+import { getDocumentScanReadiness } from "./clamav.ts";
+import {
+  logEvent,
+  recordHttpRequest,
+  recordStartup,
+  renderPrometheusMetrics,
+  routeTemplate,
+} from "./observability.ts";
 
 type ApiRequest = IncomingMessage & {
   body?: unknown;
@@ -211,6 +220,7 @@ async function serveStatic(
 export function createHttpServer(options?: {
   distDirectory?: string;
   trustedProxyHops?: number;
+  checkReadiness?: () => Promise<void>;
 }) {
   const root = resolve(options?.distDirectory ?? staticRoot);
   const trustedProxyHops = options?.trustedProxyHops ?? 0;
@@ -219,18 +229,99 @@ export function createHttpServer(options?: {
   }
 
   return createServer(async (request, response) => {
+    const requestId = randomUUID();
+    const startedAt = process.hrtime.bigint();
+    response.setHeader("X-Request-ID", requestId);
+    setSecurityHeaders(response);
+    response.once("finish", () => {
+      let pathname = "/";
+      try {
+        pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+      } catch {
+        pathname = "/invalid";
+      }
+      const durationSeconds = Number(process.hrtime.bigint() - startedAt) / 1e9;
+      recordHttpRequest(request.method, pathname, response.statusCode, durationSeconds);
+      const method = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+        .includes(request.method ?? "")
+        ? request.method!
+        : "OTHER";
+      logEvent("info", "http.request.completed", {
+        requestId,
+        method,
+        route: routeTemplate(pathname),
+        statusCode: response.statusCode,
+        durationSeconds: Number(durationSeconds.toFixed(6)),
+      });
+    });
     try {
       const requestUrl = new URL(request.url ?? "/", "http://localhost");
-      if (requestUrl.pathname === "/healthz") {
+      if (requestUrl.pathname === "/metrics") {
+        const token = process.env.METRICS_AUTH_TOKEN?.trim();
+        const authorization = request.headers.authorization;
+        const provided = authorization?.startsWith("Bearer ")
+          ? authorization.slice("Bearer ".length)
+          : "";
+        const authorized = Boolean(
+          token &&
+          Buffer.byteLength(token) >= 32 &&
+          Buffer.byteLength(token) === Buffer.byteLength(provided) &&
+          timingSafeEqual(Buffer.from(token), Buffer.from(provided)),
+        );
+        if (!authorized) {
+          sendJson(response, 404, { error: "Not found." });
+          return;
+        }
+        if (request.method !== "GET" && request.method !== "HEAD") {
+          response.statusCode = 405;
+          response.setHeader("Allow", "GET, HEAD");
+          response.end();
+          return;
+        }
+        response.statusCode = 200;
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+        response.end(request.method === "HEAD" ? undefined : renderPrometheusMetrics());
+        return;
+      }
+      const isLivenessRoute = ["/healthz", "/health", "/liveness"].includes(requestUrl.pathname);
+      if (isLivenessRoute || requestUrl.pathname === "/ready") {
+        if (request.method !== "GET" && request.method !== "HEAD") {
+          response.statusCode = 405;
+          response.setHeader("Allow", "GET, HEAD");
+          response.setHeader("Cache-Control", "no-store");
+          response.end();
+          return;
+        }
+      }
+
+      if (isLivenessRoute) {
         response.statusCode = 200;
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("Content-Type", "text/plain; charset=utf-8");
-        response.end("ok");
+        response.end(request.method === "HEAD" ? undefined : "ok");
+        return;
+      }
+
+      if (requestUrl.pathname === "/ready") {
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Content-Type", "text/plain; charset=utf-8");
+        try {
+          await (options?.checkReadiness ?? getDocumentScanReadiness)();
+          response.statusCode = 200;
+          response.end(request.method === "HEAD" ? undefined : "ready");
+        } catch (error) {
+          logEvent("error", "readiness.failed", {
+            requestId,
+            error: error instanceof Error ? error.name : "UnknownError",
+          });
+          response.statusCode = 503;
+          response.end(request.method === "HEAD" ? undefined : "not ready");
+        }
         return;
       }
 
       if (requestUrl.pathname.startsWith("/api/")) {
-        setSecurityHeaders(response);
         await serveApi(request, response, requestUrl.pathname, trustedProxyHops);
         return;
       }
@@ -242,10 +333,10 @@ export function createHttpServer(options?: {
       }
       await serveStatic(request, response, requestUrl.pathname, root);
     } catch (error) {
-      console.error(
-        "HTTP request failed:",
-        error instanceof Error ? error.name : "UnknownError",
-      );
+      logEvent("error", "http.request.failed", {
+        requestId,
+        error: error instanceof Error ? error.name : "UnknownError",
+      });
       if (!response.headersSent) {
         sendJson(response, 500, { error: "An unexpected error occurred." });
       } else {
@@ -264,12 +355,19 @@ function startServer(): void {
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 5_000;
   server.listen(port, host, () => {
-    console.info(`GIEMENS application listening on ${host}:${port}.`);
+    recordStartup("started");
+    logEvent("info", "application.started", { host, port });
+  });
+  server.once("error", (error) => {
+    recordStartup("error");
+    logEvent("error", "application.start.failed", {
+      error: error instanceof Error ? error.name : "UnknownError",
+    });
   });
   const shutdown = () => {
     server.close((error) => {
       if (error) {
-        console.error("HTTP server shutdown failed:", error.name);
+        logEvent("error", "application.shutdown.failed", { error: error.name });
         process.exitCode = 1;
       }
     });

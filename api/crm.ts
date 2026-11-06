@@ -5,6 +5,7 @@ import {
   type AuthenticatedUser,
 } from "../server/auth.ts";
 import { prisma } from "../server/prisma.ts";
+import { recordAuditEvent } from "../server/observability.ts";
 import type {
   JurivanaRequestStatus,
   JurivanaRequestType,
@@ -622,6 +623,7 @@ export function createCrmHandler(dependencies: {
         });
         return item;
       });
+      recordAuditEvent(`crm.${request.method === "POST" ? "create" : "update"}`);
       sendJson(response, request.method === "POST" ? 201 : 200, { item: result });
     } catch (error) {
       if (error instanceof CrmInputError) {

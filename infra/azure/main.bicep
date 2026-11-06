@@ -30,6 +30,9 @@ param databaseUrl string
 param authRateLimitSecret string
 
 @secure()
+param metricsAuthToken string
+
+@secure()
 param smtpUser string
 
 @secure()
@@ -38,11 +41,23 @@ param smtpPassword string
 @secure()
 param redisRestToken string
 
+@allowed([
+  'custom'
+  'microsoft365'
+  'google-workspace'
+  'zoho'
+])
+param smtpProvider string = 'custom'
 param smtpHost string
 param smtpPort string = '587'
+@description('Private hostname for the ClamAV daemon reachable from the Container App.')
+param clamavHost string
+param clamavPort string = '3310'
 param contactToEmail string
 param contactFromEmail string
 param redisRestUrl string
+@description('Optional private OTLP HTTP(S) collector endpoint; leave empty to disable export.')
+param otelExporterOtlpEndpoint string = ''
 param minReplicas int = 1
 param maxReplicas int = 3
 
@@ -96,10 +111,22 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01'
     cors: {
       corsRules: [
         {
-          allowedOrigins: siteOrigin
-          allowedMethods: 'PUT,OPTIONS,HEAD'
-          allowedHeaders: '*'
-          exposedHeaders: 'ETag,x-ms-request-id'
+          allowedOrigins: [
+            siteOrigin
+          ]
+          allowedMethods: [
+            'PUT'
+            'OPTIONS'
+            'HEAD'
+          ]
+          allowedHeaders: [
+            'content-type'
+            'x-ms-blob-type'
+          ]
+          exposedHeaders: [
+            'ETag'
+            'x-ms-request-id'
+          ]
           maxAgeInSeconds: 300
         }
       ]
@@ -189,6 +216,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           value: authRateLimitSecret
         }
         {
+          name: 'metrics-auth-token'
+          value: metricsAuthToken
+        }
+        {
           name: 'smtp-user'
           value: smtpUser
         }
@@ -233,8 +264,16 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
               secretRef: 'auth-rate-limit-secret'
             }
             {
+              name: 'METRICS_AUTH_TOKEN'
+              secretRef: 'metrics-auth-token'
+            }
+            {
               name: 'SMTP_HOST'
               value: smtpHost
+            }
+            {
+              name: 'SMTP_PROVIDER'
+              value: smtpProvider
             }
             {
               name: 'SMTP_PORT'
@@ -255,6 +294,26 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'CONTACT_FROM_EMAIL'
               value: contactFromEmail
+            }
+            {
+              name: 'CLAMAV_HOST'
+              value: clamavHost
+            }
+            {
+              name: 'CLAMAV_PORT'
+              value: clamavPort
+            }
+            {
+              name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
+              value: otelExporterOtlpEndpoint
+            }
+            {
+              name: 'DOCUMENT_PENDING_RETENTION_HOURS'
+              value: '24'
+            }
+            {
+              name: 'DOCUMENT_REJECTED_RETENTION_DAYS'
+              value: '30'
             }
             {
               name: 'UPSTASH_REDIS_REST_URL'
@@ -285,30 +344,33 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               type: 'Startup'
               httpGet: {
-                path: '/healthz'
+                path: '/liveness'
                 port: 3000
                 scheme: 'HTTP'
               }
               initialDelaySeconds: 10
               periodSeconds: 10
+              timeoutSeconds: 3
             }
             {
               type: 'Liveness'
               httpGet: {
-                path: '/healthz'
+                path: '/liveness'
                 port: 3000
                 scheme: 'HTTP'
               }
               periodSeconds: 30
+              timeoutSeconds: 3
             }
             {
               type: 'Readiness'
               httpGet: {
-                path: '/healthz'
+                path: '/ready'
                 port: 3000
                 scheme: 'HTTP'
               }
               periodSeconds: 10
+              timeoutSeconds: 5
             }
           ]
         }

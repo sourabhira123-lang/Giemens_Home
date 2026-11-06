@@ -12,7 +12,9 @@ import {
   createBlobUploadUrl,
   verifyUploadedBlob,
 } from "../server/azure-blob-storage.ts";
+import { scanUploadedBlob } from "../server/clamav.ts";
 import { prisma } from "../server/prisma.ts";
+import { recordAuditEvent } from "../server/observability.ts";
 
 type DocumentRequest = IncomingMessage & { body?: unknown };
 type DocumentResponse = ServerResponse & { statusCode: number };
@@ -303,6 +305,7 @@ export function createDocumentsHandler(dependencies: {
           });
           return created;
         });
+        recordAuditEvent("document.upload.initiated");
         sendJson(response, 201, {
           document,
           uploadUrl,
@@ -341,10 +344,47 @@ export function createDocumentsHandler(dependencies: {
           sendJson(response, 400, { error: "The uploaded file did not pass integrity verification." });
           return;
         }
+        let scanResult: "clean" | "infected";
+        try {
+          scanResult = await scanUploadedBlob(document.storageKey, document.sizeBytes);
+        } catch (error) {
+          console.error("Document malware scan is unavailable:", error instanceof Error ? error.name : "UnknownError");
+          sendJson(response, 503, { error: "The document is quarantined until its security scan can complete." });
+          return;
+        }
+        if (scanResult === "infected") {
+          const rejected = await prisma.$transaction(async (database) => {
+            const result = await database.document.updateMany({
+              where: { id: document.id, status: "PENDING_UPLOAD" },
+              data: { status: "REJECTED" },
+            });
+            if (result.count !== 1) return false;
+            await database.auditLog.create({
+              data: {
+                actorUserId: user.id,
+                action: "document.scan.rejected",
+                entityType: "document",
+                entityId: document.id,
+              },
+            });
+            return true;
+          });
+          if (!rejected) {
+            sendJson(response, 409, { error: "The document upload is no longer available for scanning." });
+            return;
+          }
+          recordAuditEvent("document.scan.rejected");
+          sendJson(response, 422, { error: "The uploaded file failed the malware scan." });
+          return;
+        }
         const updated = await prisma.$transaction(async (database) => {
-          const ready = await database.document.update({
-            where: { id: document.id },
+          const result = await database.document.updateMany({
+            where: { id: document.id, status: "PENDING_UPLOAD" },
             data: { status: "READY" },
+          });
+          if (result.count !== 1) return undefined;
+          const ready = await database.document.findUniqueOrThrow({
+            where: { id: document.id },
             select: {
               id: true,
               fileName: true,
@@ -365,6 +405,11 @@ export function createDocumentsHandler(dependencies: {
           });
           return ready;
         });
+        if (!updated) {
+          sendJson(response, 409, { error: "The document upload is no longer available for scanning." });
+          return;
+        }
+        recordAuditEvent("document.upload.completed");
         sendJson(response, 200, { document: updated });
         return;
       }

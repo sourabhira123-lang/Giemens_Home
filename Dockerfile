@@ -35,10 +35,12 @@ COPY --chown=node:node api ./api
 COPY --chown=node:node server ./server
 COPY --chown=node:node src/features ./src/features
 COPY --chown=node:node scripts/validate-runtime-env.mjs ./scripts/validate-runtime-env.mjs
+COPY --chown=node:node scripts/cleanup-documents.ts ./scripts/cleanup-documents.ts
+COPY --chown=node:node scripts/check-email.ts ./scripts/check-email.ts
 
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:3000/liveness').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["npm", "start"]

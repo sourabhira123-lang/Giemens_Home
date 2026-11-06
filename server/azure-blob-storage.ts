@@ -130,6 +130,7 @@ export async function verifyUploadedBlob(
       prefixSize += sample.byteLength;
     }
   }
+
   const signature = Buffer.concat(prefix);
   const validSignature =
     expected.contentType === "application/pdf"
@@ -153,4 +154,21 @@ export async function verifyUploadedBlob(
   ) {
     throw new Error("Uploaded document checksum verification failed.");
   }
+}
+
+export async function getQuarantinedBlobStream(blobName: string) {
+  const config = getStorageConfig();
+  const blob = getServiceClient(config)
+    .getContainerClient(config.containerName)
+    .getBlockBlobClient(blobName);
+  const download = await blob.download();
+  return download.readableStreamBody;
+}
+
+export async function deleteBlobIfExists(blobName: string): Promise<void> {
+  const config = getStorageConfig();
+  const blob = getServiceClient(config)
+    .getContainerClient(config.containerName)
+    .getBlockBlobClient(blobName);
+  await blob.deleteIfExists();
 }

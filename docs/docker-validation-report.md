@@ -14,9 +14,9 @@
 | Docker image build | **BLOCKED** | `docker version`/`docker info` could reach the Docker CLI but not the Docker Desktop Linux engine (`dockerDesktopLinuxEngine` named pipe unavailable). |
 | Container startup | **BLOCKED** | No image could be built or started without a running Docker engine. |
 | Application startup sequence | **HOST SMOKE TEST PASSED** | The Node HTTP server started with production runtime environment variables and served `/healthz`. This is not a container test. |
-| `/healthz` | **PASSED (host smoke test)** | HTTP 200, `text/plain`, body `ok`. This is the health route configured in the Dockerfile and Azure probes. |
-| `/health` | **NOT IMPLEMENTED** | HTTP 200 returned the SPA `index.html`; this is not a health response. |
-| `/ready` | **NOT IMPLEMENTED** | HTTP 200 returned the SPA `index.html`; this is not a readiness response. |
+| `/healthz` | **PASSED (host smoke test, 2026-11-05)** | HTTP 200, `text/plain`, body `ok`. Retained as a compatibility route. |
+| `/health`, `/liveness` | **UNIT TEST PASSED; CONTAINER VALIDATION BLOCKED** | Added as process-level liveness routes and covered by the HTTP test; Docker engine unavailable. |
+| `/ready` | **UNIT TEST PASSED; DATABASE/CONTAINER VALIDATION BLOCKED** | Added as a PostgreSQL-backed readiness route and tested for 200/503 behavior with an injected check; current database authentication fails with P1000. |
 
 ## Startup sequence checked
 
@@ -26,19 +26,24 @@ environment validation passed in the host smoke test. The app binds to
 `0.0.0.0:3000` by default; Compose publishes it on loopback at
 `127.0.0.1:${APP_PORT:-3000}`.
 
-The Dockerfile healthcheck probes `http://127.0.0.1:3000/healthz`. The server
-implements `/healthz` as a process-level health endpoint. It does not check
-database, Redis, SMTP, or Blob dependency health.
+The Dockerfile healthcheck probes `http://127.0.0.1:3000/liveness`. The
+`/liveness` and compatibility `/healthz` routes indicate process-level health;
+they do not check database, Redis, SMTP, or Blob dependency health. `/ready`
+performs a PostgreSQL `SELECT 1`.
 
-Unknown non-file paths fall through to the SPA index page. As a result,
-`/health` and `/ready` currently appear successful to a basic HTTP status check
-but return HTML. Do not configure orchestrator probes to use those paths.
+At the time of the 2026-11-05 host smoke test, `/health` and `/ready` fell
+through to the SPA. The current source now implements `/health`, `/liveness`,
+and database-backed `/ready`; route behavior has unit-test coverage, but actual
+database connectivity and container health remain unvalidated. Unknown
+non-file paths still fall through to the SPA index page, so probes must use the
+explicit health routes.
 
 ## Dockerfile and Compose review notes
 
 - Dockerfile uses a Node 22 Debian slim image, separate build/runtime dependency
   stages, Prisma Client generation, a required `VITE_SITE_URL` build argument,
-  a non-root `node` runtime user, and a `/healthz` Docker healthcheck.
+  a non-root `node` runtime user, and a `/liveness` Docker healthcheck. The
+  existing `/healthz` route remains for compatibility.
 - Compose uses `init`, a restart policy, loopback-only port binding,
   `no-new-privileges`, and drops Linux capabilities.
 - The Compose model was rendered/validated, but runtime mount/network,
@@ -82,11 +87,12 @@ container execution were blocked.
 4. Verify the configured health endpoint:
 
    ```powershell
-   Invoke-WebRequest http://127.0.0.1:3000/healthz
+   Invoke-WebRequest http://127.0.0.1:3000/liveness
    docker inspect --format='{{.State.Health.Status}}' (docker compose ps -q giemens)
    ```
 
-5. Confirm the application startup log and health status, then stop the
+5. Confirm `/liveness` returns 200, `/ready` returns 200 only while PostgreSQL
+   is reachable, and the container health status is healthy. Then stop the
    validation service:
 
    ```powershell

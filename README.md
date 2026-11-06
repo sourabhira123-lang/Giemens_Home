@@ -21,6 +21,12 @@ in [the deployment guide](./docs/deployment.md).
 For admin login and role permissions, see
 [the authentication guide](./docs/authentication.md).
 
+For the production-readiness verdict, database recovery gates, Linux
+certification, monitoring, and backup/restore procedures, start with
+[the production readiness assessment](./docs/PRODUCTION_READINESS.md).
+The latest deployment gate and blocker evidence is in the
+[go-live certification](./docs/GO_LIVE_CERTIFICATION.md).
+
 `npm run dev` starts the Vite website. To run the Vercel serverless contact
 function locally, add the required development credentials to `.env.local`,
 then run `npx vercel dev`. Opening the site with
@@ -97,6 +103,10 @@ The repository includes a Docker image that serves the prerendered Vite site
 and the existing `/api/*` handlers from one Node.js process. See
 [the deployment guide](./docs/deployment.md) for Azure, AWS, DigitalOcean, and
 VPS steps. Vercel remains supported via `vercel.json`.
+Linux operators can use the database verification scripts
+`scripts/connect-db.sh`, `scripts/db-health.sh`,
+`scripts/migration-check.sh`, and `scripts/verify-db.sh` after supplying
+`DATABASE_URL` through a protected environment or ignored `.env` file.
 
 The contact API sends plain-text inquiries through the configured SMTP relay
 and does not report success unless delivery is accepted. It validates request

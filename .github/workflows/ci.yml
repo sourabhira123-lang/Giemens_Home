@@ -20,6 +20,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: bash -n scripts/db-common.sh scripts/connect-db.sh scripts/db-health.sh scripts/migration-check.sh scripts/verify-db.sh scripts/backup-postgres.sh scripts/restore-postgres.sh scripts/backup-blob.sh scripts/restore-blob.sh
       - run: npm run prisma:validate
       - run: npm run prisma:generate
       - run: npm run typecheck
