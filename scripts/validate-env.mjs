@@ -8,6 +8,10 @@ if (isVercelProduction && !env.VITE_SITE_URL?.trim()) {
   console.error("VITE_SITE_URL is required for a Vercel production build.");
   process.exit(1);
 }
+if (isVercelProduction && !env.VITE_JURIVANA_URL?.trim()) {
+  console.error("VITE_JURIVANA_URL is required for a Vercel production build.");
+  process.exit(1);
+}
 if (
   isVercelProduction &&
   /replace(?:[-_ ]?with)?|example\.com|\.example\b/i.test(env.VITE_SITE_URL)

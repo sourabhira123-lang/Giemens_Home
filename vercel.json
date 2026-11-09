@@ -1,5 +1,6 @@
 {
   "framework": "vite",
+  "installCommand": "npm install",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
@@ -25,6 +26,7 @@
     { "source": "/consultancy", "destination": "/consultancy/index.html" },
     { "source": "/careers", "destination": "/careers/index.html" },
     { "source": "/contact", "destination": "/contact/index.html" },
+    { "source": "/ecosystem/jurivana", "destination": "/ecosystem/jurivana/index.html" },
     { "source": "/privacy-policy", "destination": "/privacy-policy/index.html" },
     { "source": "/terms", "destination": "/terms/index.html" },
     { "source": "/disclaimer", "destination": "/disclaimer/index.html" }

@@ -9,7 +9,7 @@ const targets = [
   },
   {
     file: ".env.production",
-    siteUrl: "https://www.giemens.com",
+    siteUrl: "https://giemens.com",
     databaseHost: "postgres.example.com",
   },
 ];
@@ -36,8 +36,8 @@ for (const target of targets) {
     "SMTP_PORT=587",
     "SMTP_USER=REPLACE_WITH_SMTP_USERNAME",
     "SMTP_PASSWORD=REPLACE_WITH_SMTP_PASSWORD",
-    "CONTACT_TO_EMAIL=admin@jurivana.example",
-    "CONTACT_FROM_EMAIL=noreply@jurivana.example",
+    "CONTACT_TO_EMAIL=REPLACE_WITH_VERIFIED_CONTACT_TO_EMAIL",
+    "CONTACT_FROM_EMAIL=REPLACE_WITH_VERIFIED_CONTACT_FROM_EMAIL",
     "UPSTASH_REDIS_REST_URL=https://replace-with-upstash-endpoint.upstash.io",
     "UPSTASH_REDIS_REST_TOKEN=REPLACE_WITH_UPSTASH_REST_TOKEN",
     "AZURE_STORAGE_ACCOUNT_URL=https://replacewithstorage.blob.core.windows.net",
