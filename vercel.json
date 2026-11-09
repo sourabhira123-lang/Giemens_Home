@@ -5,6 +5,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/contact.ts": {
+      "includeFiles": "server/**/*.ts",
       "maxDuration": 10
     },
     "api/leads.ts": {
