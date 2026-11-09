@@ -12,6 +12,7 @@ import {
   EmailService,
   resolveSmtpSettings,
 } from "../server/email-service.ts";
+import { createInMemoryRateLimiter } from "../server/in-memory-rate-limit.ts";
 import { logEvent, recordEmailDelivery } from "../server/observability.ts";
 
 type ApiRequest = IncomingMessage & {
@@ -30,10 +31,13 @@ type RateLimitResult = {
 
 type ContactHandlerDependencies = {
   checkRateLimit: (ip: string) => Promise<RateLimitResult>;
-  sendEmail: (inquiry: ContactInquiry) => Promise<boolean>;
+  sendEmail?: (inquiry: ContactInquiry) => Promise<boolean>;
 };
 
 const maxBodyBytes = 12_000;
+const fallbackRateLimit = createInMemoryRateLimiter(5, 15 * 60 * 1000);
+let loggedSmtpDisabled = false;
+let loggedRedisDisabled = false;
 
 function applySecurityHeaders(response: ApiResponse) {
   response.setHeader("Cache-Control", "no-store");
@@ -189,6 +193,11 @@ export function createContactHandler({
       return;
     }
 
+    if (!sendEmail) {
+      sendJson(response, 200, { notification: "disabled" });
+      return;
+    }
+
     try {
       const accepted = await sendEmail(result.value);
       if (!accepted) {
@@ -225,22 +234,34 @@ function requiredEnv(
 
 function readRuntimeConfig(env: NodeJS.ProcessEnv) {
   const errors: string[] = [];
-  const smtpProvider = env.SMTP_PROVIDER?.trim().toLowerCase() || "custom";
-  let smtpSettings: ReturnType<typeof resolveSmtpSettings> | undefined;
-  try {
-    smtpSettings = resolveSmtpSettings(env);
-  } catch {
-    errors.push("SMTP_PROVIDER/SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASSWORD");
+  const isConfigured = (value: string | undefined) =>
+    Boolean(value?.trim() &&
+      !/replace(?:[-_ ]?with)?|example\.com|\.example\b/i.test(value));
+  const provider = (env.SMTP_PROVIDER?.trim() || "custom").toLowerCase();
+  const defaultSmtpHosts: Record<string, string> = {
+    microsoft365: "smtp.office365.com",
+    "google-workspace": "smtp.gmail.com",
+    zoho: "smtp.zoho.com",
+  };
+  const smtpHost = env.SMTP_HOST?.trim();
+  const smtpEnabled = isConfigured(env.SMTP_USER) &&
+    isConfigured(env.SMTP_PASSWORD) &&
+    (smtpHost ? isConfigured(smtpHost) : Boolean(defaultSmtpHosts[provider]));
+  if (smtpEnabled) {
+    try {
+      resolveSmtpSettings(env);
+    } catch {
+      errors.push("SMTP_PROVIDER/SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASSWORD");
+    }
   }
-  const smtpUser = requiredEnv(env, "SMTP_USER", errors);
-  const smtpPassword = requiredEnv(env, "SMTP_PASSWORD", errors);
   const recipient = requiredEnv(env, "CONTACT_TO_EMAIL", errors);
   const sender = requiredEnv(env, "CONTACT_FROM_EMAIL", errors);
-  const redisUrl = requiredEnv(env, "UPSTASH_REDIS_REST_URL", errors);
-  const redisToken = requiredEnv(env, "UPSTASH_REDIS_REST_TOKEN", errors);
+  const redisUrl = env.UPSTASH_REDIS_REST_URL?.trim();
+  const redisToken = env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  const redisEnabled = isConfigured(redisUrl) && isConfigured(redisToken);
   if (recipient && !isValidEmail(recipient)) errors.push("CONTACT_TO_EMAIL");
   if (sender && !isValidEmail(sender)) errors.push("CONTACT_FROM_EMAIL");
-  if (redisUrl) {
+  if (redisEnabled && redisUrl) {
     try {
       const url = new URL(redisUrl);
       if (url.protocol !== "https:" || url.username || url.password) {
@@ -256,13 +277,10 @@ function readRuntimeConfig(env: NodeJS.ProcessEnv) {
   }
   return {
     ok: true as const,
-    smtpProvider,
-    smtpHost: smtpSettings!.host,
-    smtpPort: smtpSettings!.port,
-    smtpUser,
-    smtpPassword,
+    smtpEnabled,
     recipient,
     sender,
+    redisEnabled,
     redisUrl,
     redisToken,
   };
@@ -280,41 +298,54 @@ export default async function handler(
     return;
   }
 
-  const redis = new Redis({
-    url: config.redisUrl,
-    token: config.redisToken,
-  });
-  const limiter = new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(5, "15 m"),
-    prefix: "giemens:contact",
-  });
-  const emailService = new EmailService(createEmailProvider(process.env));
+  const limiter = config.redisEnabled
+    ? new Ratelimit({
+        redis: new Redis({ url: config.redisUrl!, token: config.redisToken! }),
+        limiter: Ratelimit.slidingWindow(5, "15 m"),
+        prefix: "giemens:contact",
+      })
+    : undefined;
+  const emailService = config.smtpEnabled
+    ? new EmailService(createEmailProvider(process.env))
+    : undefined;
+  if (!emailService && !loggedSmtpDisabled) {
+    console.warn("SMTP not configured. Contact notifications disabled.");
+    loggedSmtpDisabled = true;
+  }
+  if (!limiter && !loggedRedisDisabled) {
+    console.warn("Redis integration disabled. Contact rate limiting is per instance.");
+    loggedRedisDisabled = true;
+  }
 
   const contactHandler = createContactHandler({
     checkRateLimit: async (ip) => {
+      if (!limiter) return fallbackRateLimit(ip);
       const result = await limiter.limit(ip);
       return { success: result.success, reset: result.reset };
     },
-    sendEmail: async (inquiry) => {
-      await emailService.send({
-        from: config.sender,
-        to: config.recipient,
-        replyTo: inquiry.email,
-        subject: `[GIEMENS] ${inquiry.subject}`,
-        text: [
-          `Name: ${inquiry.fullName}`,
-          `Email: ${inquiry.email}`,
-          `Phone: ${inquiry.phone ?? "Not provided"}`,
-          `Organization: ${inquiry.organization ?? "Not provided"}`,
-          `Category: ${inquiry.category}`,
-          "",
-          "Message:",
-          inquiry.message,
-        ].join("\n"),
-      });
-      return true;
-    },
+    ...(emailService
+      ? {
+          sendEmail: async (inquiry: ContactInquiry) => {
+            await emailService.send({
+              from: config.sender,
+              to: config.recipient,
+              replyTo: inquiry.email,
+              subject: `[GIEMENS] ${inquiry.subject}`,
+              text: [
+                `Name: ${inquiry.fullName}`,
+                `Email: ${inquiry.email}`,
+                `Phone: ${inquiry.phone ?? "Not provided"}`,
+                `Organization: ${inquiry.organization ?? "Not provided"}`,
+                `Category: ${inquiry.category}`,
+                "",
+                "Message:",
+                inquiry.message,
+              ].join("\n"),
+            });
+            return true;
+          },
+        }
+      : {}),
   });
 
   await contactHandler(request, response);

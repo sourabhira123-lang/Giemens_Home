@@ -1047,9 +1047,12 @@ function ContactForm() {
       }
       const responseBody =
         typeof result === "object" && result !== null
-          ? (result as { ok?: unknown; error?: unknown })
+          ? (result as { ok?: unknown; error?: unknown; notification?: unknown })
           : undefined;
-      if (response.status !== 200 || responseBody?.ok !== true) {
+      if (
+        response.status !== 200 ||
+        (responseBody?.ok !== true && responseBody?.notification !== "disabled")
+      ) {
         setStatus("error");
         setMessage(
           (typeof responseBody?.error === "string" && responseBody.error
@@ -1064,7 +1067,11 @@ function ContactForm() {
       setCategory(initialCategory);
       setBusinessDivision(getBusinessDivision(initialCategory, requestedDivision));
       setStatus("success");
-      setMessage("Your inquiry has been submitted. Thank you for getting in touch.");
+      setMessage(
+        responseBody.notification === "disabled"
+          ? "Your inquiry has been saved. Email notifications are temporarily disabled."
+          : "Your inquiry has been submitted. Thank you for getting in touch.",
+      );
     } catch (error) {
       console.error("Contact form submission failed:", error);
       setStatus("error");

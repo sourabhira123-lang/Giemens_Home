@@ -152,51 +152,67 @@ preventing reliable canonical metadata and sitemap generation. Updated:
 Set these in the Vercel project's **Production** environment. Do not commit
 values or copy template placeholders into Vercel.
 
-**Build/public configuration**
+**Required Vercel production configuration**
 
 ```text
 VITE_SITE_URL=https://giemens.com
 VITE_JURIVANA_URL=https://jurivana.giemens.com
-VITE_CONTACT_ENDPOINT=/api/contact
+CONTACT_FROM_EMAIL=<personal email address>
+CONTACT_TO_EMAIL=<personal email address>
 ```
 
-**Required server configuration checked by `scripts/validate-env.mjs`**
+`VITE_CONTACT_ENDPOINT=/api/contact` is optional and is the client default.
+The Vercel build does not require the standalone server's database or
+authentication settings. `DATABASE_URL` and `AUTH_RATE_LIMIT_SECRET` remain
+required when running the full CRM/authenticated Node server.
+
+**Optional integrations**
+
+Set complete credentials only when enabling each integration:
 
 ```text
-DATABASE_URL
-AUTH_RATE_LIMIT_SECRET        # at least 32 bytes of random secret
+SMTP_HOST                     # custom provider; named providers have defaults
+SMTP_PORT                     # optional; default 587
+SMTP_PROVIDER                 # custom, microsoft365, google-workspace, zoho
 SMTP_USER
 SMTP_PASSWORD
-CLAMAV_HOST
-CONTACT_TO_EMAIL              # verified, monitored mailbox
-CONTACT_FROM_EMAIL            # verified sender accepted by SMTP provider
-AZURE_STORAGE_ACCOUNT_URL
-AZURE_STORAGE_CONTAINER
 UPSTASH_REDIS_REST_URL        # HTTPS
 UPSTASH_REDIS_REST_TOKEN
+CLAMAV_HOST
+CLAMAV_PORT                   # optional; default 3310
+AZURE_STORAGE_ACCOUNT_URL
+AZURE_STORAGE_CONTAINER
 ```
 
-Also configure `SMTP_PROVIDER` (`custom`, `microsoft365`,
-`google-workspace`, or `zoho`), `SMTP_HOST` when required by the provider,
-and `SMTP_PORT` (1–65535). Configure `ADMIN_EMAIL`, `ADMIN_NAME`, and a
-unique `ADMIN_PASSWORD` only through the approved secret store if production
-bootstrap/seed is required. `METRICS_AUTH_TOKEN` is optional; when set it
-must be at least 32 bytes. Add OTLP and retention settings only when those
-services/features are enabled.
+If an optional integration is missing or incomplete, its validator emits a
+warning and the build proceeds. Readiness reports each as `disabled`. Contact
+leads are persisted to PostgreSQL without SMTP, but no email notification is
+sent; the form reports that status. Without Redis, form APIs use a bounded
+per-instance rate limiter. Document workflows still require Blob Storage and
+ClamAV.
+Configure `ADMIN_EMAIL`, `ADMIN_NAME`, and a unique `ADMIN_PASSWORD` only
+through the approved secret store if production bootstrap/seed is required.
+`METRICS_AUTH_TOKEN` is optional; when set it must be at least 32 bytes.
+Add OTLP and retention settings only when those services/features are enabled.
 
 ### Validation and expected result
 
 The validator was exercised with disposable, non-production values and
 reported `Build environment validation passed.` A local production build
 also passed with the ignored local template and generated the sitemap.
-These checks do **not** prove that Vercel has real database, SMTP, ClamAV,
-Azure, Upstash, or verified email values.
+These checks do **not** prove that Vercel has verified contact mailbox values,
+or that any optional integration has been activated and can deliver/serve
+traffic.
 
 Before release, run the production build in Vercel with the actual protected
 variables. Expected output includes:
 
 ```text
 Build environment validation passed.
+SMTP not configured. Contact notifications disabled.
+Redis integration disabled
+ClamAV integration disabled
+Blob Storage integration disabled
 Generated HTML metadata for 35 routes.
 Generated sitemap.xml with 35 routes.
 ```

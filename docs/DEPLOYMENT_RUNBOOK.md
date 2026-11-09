@@ -23,12 +23,13 @@ approvals.
   Blob are external stateful dependencies; do not introduce a volume as an
   emergency workaround.
 - Allow up to 120 seconds for Docker health startup and up to 110 seconds for
-  the Azure Container Apps startup probe while required dependencies are
-  checked before the HTTP listener binds.
+  the Azure Container Apps startup probe while PostgreSQL and configured
+  optional integrations are checked before the HTTP listener binds.
 
 ## 2. Environment readiness
 
-Prepare the protected deployment environment with:
+For the full CRM/authenticated server runtime, prepare the required protected
+environment with:
 
 ```text
 DATABASE_URL
@@ -36,16 +37,22 @@ ADMIN_EMAIL
 ADMIN_NAME
 ADMIN_PASSWORD
 AUTH_RATE_LIMIT_SECRET
-METRICS_AUTH_TOKEN
 VITE_SITE_URL
 VITE_JURIVANA_URL
+CONTACT_FROM_EMAIL
+CONTACT_TO_EMAIL
+TRUST_PROXY_HOPS
+```
+
+Configure these only when activating the associated integration:
+
+```text
+METRICS_AUTH_TOKEN
 SMTP_PROVIDER
 SMTP_HOST
 SMTP_PORT
 SMTP_USER
 SMTP_PASSWORD
-CONTACT_FROM_EMAIL
-CONTACT_TO_EMAIL
 AZURE_STORAGE_ACCOUNT_URL
 AZURE_STORAGE_CONTAINER
 UPSTASH_REDIS_REST_URL
@@ -65,8 +72,10 @@ TRUST_PROXY_HOPS
 origin; verify the destination hosts Jurivana and has a valid certificate.
 `DATABASE_URL` must target the approved `giemens` database and
 `giemens_crm` schema and use TLS for remote hosts. Use 32-byte random secrets
-for `AUTH_RATE_LIMIT_SECRET` and `METRICS_AUTH_TOKEN`. Confirm all external
-services are private/restricted as intended.
+for `AUTH_RATE_LIMIT_SECRET` and `METRICS_AUTH_TOKEN` when configured.
+Unconfigured SMTP, Redis, ClamAV and Blob Storage are logged as disabled and
+do not block startup or readiness; dependent APIs fail closed until enabled.
+Confirm all configured external services are private/restricted as intended.
 
 For local development only, create ignored files if they do not already exist:
 

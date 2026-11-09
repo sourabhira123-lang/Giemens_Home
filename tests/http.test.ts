@@ -17,6 +17,12 @@ test("container HTTP server serves health, prerendered pages, and safe API error
     distDirectory,
     checkReadiness: async () => {
       if (!ready) throw new Error("database unavailable");
+      return {
+        smtp: "disabled",
+        redis: "disabled",
+        clamav: "disabled",
+        blobStorage: "disabled",
+      };
     },
   });
   const previousMetricsToken = process.env.METRICS_AUTH_TOKEN;
@@ -31,25 +37,33 @@ test("container HTTP server serves health, prerendered pages, and safe API error
 
     const health = await fetch(`${origin}/healthz`);
     assert.equal(health.status, 200);
-    assert.equal(await health.text(), "ok");
+    assert.equal(await health.text(), "healthy");
     assert.ok(health.headers.get("x-request-id"));
     assert.ok(health.headers.get("x-content-type-options"));
 
     for (const path of ["/health", "/liveness"]) {
       const response = await fetch(`${origin}${path}`);
       assert.equal(response.status, 200);
-      assert.equal(await response.text(), "ok");
+      assert.equal(await response.text(), "healthy");
     }
 
     const readiness = await fetch(`${origin}/ready`);
     assert.equal(readiness.status, 200);
-    assert.equal(await readiness.text(), "ready");
+    assert.deepEqual(await readiness.json(), {
+      status: "healthy",
+      details: {
+        smtp: "disabled",
+        redis: "disabled",
+        clamav: "disabled",
+        blobStorage: "disabled",
+      },
+    });
     const invalidProbeMethod = await fetch(`${origin}/ready`, { method: "POST" });
     assert.equal(invalidProbeMethod.status, 405);
     ready = false;
     const unavailable = await fetch(`${origin}/ready`);
     assert.equal(unavailable.status, 503);
-    assert.equal(await unavailable.text(), "not ready");
+    assert.deepEqual(await unavailable.json(), { status: "unhealthy" });
 
     const route = await fetch(`${origin}/admin/dashboard`);
     assert.equal(route.status, 200);

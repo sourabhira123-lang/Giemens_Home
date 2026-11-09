@@ -55,26 +55,33 @@ Values in the browser must use the `VITE_` prefix; never put API keys in a
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `VITE_SITE_URL` | Required for production | Public site origin, e.g. `https://www.example.com`; used for canonical tags and sitemap URLs. |
-| `VITE_JURIVANA_URL` | Optional | HTTPS origin for the standalone Jurivana application; defaults to `https://jurivana.giemens.com`. |
-| `VITE_CONTACT_ENDPOINT` | Required for production | Must be `/api/contact`. |
-| `DATABASE_URL` | Required for CRM and admin authentication | PostgreSQL connection URL for the `giemens_crm` schema. |
-| `AUTH_RATE_LIMIT_SECRET` | Required for production | Random secret of at least 32 bytes for hashing login rate-limit keys. |
-| `SMTP_HOST` | Required | SMTP relay hostname. |
+| `VITE_SITE_URL` | Required for Vercel production | Public HTTPS site origin; used for canonical tags and sitemap URLs. |
+| `VITE_JURIVANA_URL` | Required for Vercel production | HTTPS origin for the standalone Jurivana application. |
+| `VITE_CONTACT_ENDPOINT` | Optional | Same-origin contact API path; defaults to `/api/contact`. |
+| `DATABASE_URL` | Required for CRM and admin server runtime | PostgreSQL connection URL for the `giemens_crm` schema. |
+| `AUTH_RATE_LIMIT_SECRET` | Required for authenticated server runtime | Random secret of at least 32 bytes for hashing login rate-limit keys. |
+| `SMTP_HOST` | Optional | SMTP relay hostname; custom providers need a host, named providers have defaults. |
 | `SMTP_PORT` | Optional | SMTP port; defaults to `587` and uses implicit TLS on port `465`. |
-| `SMTP_USER` | Required | SMTP authentication username. |
-| `SMTP_PASSWORD` | Required | SMTP authentication password; keep it in a secret store. |
-| `CONTACT_TO_EMAIL` | Required | Business mailbox that receives inquiries. |
-| `CONTACT_FROM_EMAIL` | Required | Sender address authorized by the SMTP relay. |
-| `UPSTASH_REDIS_REST_URL` | Required | HTTPS REST URL for the Upstash Redis database used by distributed rate limiting. |
-| `UPSTASH_REDIS_REST_TOKEN` | Required | Secret Upstash REST token. |
+| `SMTP_USER` | Optional | SMTP authentication username; SMTP is disabled unless credentials are configured. |
+| `SMTP_PASSWORD` | Optional | SMTP authentication password; keep it in a secret store. |
+| `CONTACT_TO_EMAIL` | Required for Vercel production | Personal or company destination address; no email is sent while SMTP is disabled. |
+| `CONTACT_FROM_EMAIL` | Required for Vercel production | Personal or company sender address for future SMTP delivery; no email is sent while SMTP is disabled. |
+| `UPSTASH_REDIS_REST_URL` | Optional | HTTPS REST URL for Upstash distributed rate limiting. |
+| `UPSTASH_REDIS_REST_TOKEN` | Optional | Secret Upstash REST token; Redis is disabled unless URL and token are configured. |
 | `TRUST_PROXY_HOPS` | Optional | Number of trusted reverse proxies in front of the Node runtime; leave at `0` unless configured and network-restricted. |
-| `AZURE_STORAGE_ACCOUNT_URL` | Required for document uploads | HTTPS Blob account endpoint; Azure production uses managed identity. |
-| `AZURE_STORAGE_CONTAINER` | Required for document uploads | Private Blob container name (Azure template provisions `documents`). |
+| `AZURE_STORAGE_ACCOUNT_URL` | Optional | HTTPS Blob account endpoint; Azure production uses managed identity. |
+| `AZURE_STORAGE_CONTAINER` | Optional | Private Blob container name; configure with the account URL to enable document storage. |
+| `CLAMAV_HOST` | Optional | Private ClamAV daemon; configure to enable document scanning. |
 
-The API rejects requests when required secrets are missing, malformed, or its
-rate-limit service is unavailable. It allows five contact attempts per IP per
-15 minutes. Keep SMTP and Upstash credentials in the deployment platform's
+Missing optional integrations emit a warning and do not block a Vercel build.
+Readiness reports unconfigured SMTP, Redis, ClamAV, and Blob Storage as
+`disabled`. When SMTP is absent, lead submissions are still saved to
+PostgreSQL and the contact API explicitly reports that email notifications are
+disabled; no email is sent. Without Redis, contact and lead APIs use a bounded,
+per-instance fallback rate limiter (five attempts per IP per 15 minutes); use
+Redis for shared rate limits across serverless instances. Document workflows
+that depend on Blob Storage or ClamAV remain unavailable until those
+integrations are configured. Keep credentials in the deployment platform's
 secret store and rotate them if exposed.
 
 The project targets Node.js 22.x on Vercel. Its npm `allowScripts` policy
@@ -109,10 +116,11 @@ Linux operators can use the database verification scripts
 `scripts/migration-check.sh`, and `scripts/verify-db.sh` after supplying
 `DATABASE_URL` through a protected environment or ignored `.env` file.
 
-The contact API sends plain-text inquiries through the configured SMTP relay
-and does not report success unless delivery is accepted. It validates request
-origin, content type, size, fields, phone/email formats, honeypot and rate
-limits.
+The contact API saves leads before attempting email delivery. Without SMTP, it
+does not send an email and reports this state explicitly after lead persistence.
+When SMTP is configured, it sends plain-text inquiries through the relay and
+reports delivery success only after acceptance. It validates request origin,
+content type, size, fields, phone/email formats, honeypot and rate limits.
 
 ## Owner review before launch
 

@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "start": "node scripts/validate-runtime-env.mjs && node --experimental-strip-types --import ./server/instrumentation.ts server/http.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/contact.test.ts tests/leads.test.ts tests/leads-api.test.ts tests/auth.test.ts tests/http.test.ts tests/crm-api.test.ts tests/documents-api.test.ts tests/email-service.test.ts tests/clamav.test.ts tests/seed-config.test.ts tests/readiness.test.ts",
+    "test": "node --experimental-strip-types --test tests/contact.test.ts tests/leads.test.ts tests/leads-api.test.ts tests/auth.test.ts tests/http.test.ts tests/crm-api.test.ts tests/documents-api.test.ts tests/email-service.test.ts tests/clamav.test.ts tests/seed-config.test.ts tests/readiness.test.ts tests/env-validation.test.ts tests/rate-limit.test.ts",
     "prisma:validate": "prisma validate --schema prisma/schema.prisma",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",

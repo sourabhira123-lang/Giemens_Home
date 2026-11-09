@@ -5,6 +5,7 @@ import { isIP } from "node:net";
 import type { LeadStatus } from "../src/features/leads/model.ts";
 import { isLeadStatus } from "../src/features/leads/validation.ts";
 import { leadController } from "../server/lead-controller.ts";
+import { createInMemoryRateLimiter } from "../server/in-memory-rate-limit.ts";
 import type { LeadSubmission, NewLead } from "../src/features/leads/model.ts";
 import {
   getAuthenticatedUser,
@@ -41,6 +42,8 @@ type LeadHandlerDependencies = {
 };
 
 const maxBodyBytes = 12_000;
+const fallbackRateLimit = createInMemoryRateLimiter(5, 15 * 60 * 1000);
+let loggedRedisDisabled = false;
 
 function applyHeaders(response: ApiResponse) {
   response.setHeader("Cache-Control", "no-store");
@@ -324,21 +327,20 @@ export default async function handler(
 ): Promise<void> {
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
-  if (!redisUrl || !redisToken) {
-    applyHeaders(response);
-    console.error("Lead service rate-limit configuration is incomplete.");
-    sendJson(response, 503, { error: "The lead service is temporarily unavailable." });
-    return;
+  const limiter = redisUrl && redisToken
+    ? new Ratelimit({
+        redis: new Redis({ url: redisUrl, token: redisToken }),
+        limiter: Ratelimit.slidingWindow(5, "15 m"),
+        prefix: "giemens:leads",
+      })
+    : undefined;
+  if (!limiter && !loggedRedisDisabled) {
+    console.warn("Redis integration disabled. Lead rate limiting is per instance.");
+    loggedRedisDisabled = true;
   }
-
-  const redis = new Redis({ url: redisUrl, token: redisToken });
-  const limiter = new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(5, "15 m"),
-    prefix: "giemens:leads",
-  });
   const leadHandler = createLeadHandler({
     checkRateLimit: async (ip) => {
+      if (!limiter) return fallbackRateLimit(ip);
       const result = await limiter.limit(ip);
       return { success: result.success, reset: result.reset };
     },

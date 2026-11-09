@@ -15,6 +15,7 @@ import documentsHandler from "../api/documents.ts";
 import {
   checkApplicationReadiness,
   DependencyReadinessError,
+  type IntegrationReadiness,
 } from "./readiness.ts";
 import {
   logEvent,
@@ -223,7 +224,7 @@ async function serveStatic(
 export function createHttpServer(options?: {
   distDirectory?: string;
   trustedProxyHops?: number;
-  checkReadiness?: () => Promise<void>;
+  checkReadiness?: () => Promise<IntegrationReadiness>;
 }) {
   const root = resolve(options?.distDirectory ?? staticRoot);
   const trustedProxyHops = options?.trustedProxyHops ?? 0;
@@ -302,17 +303,21 @@ export function createHttpServer(options?: {
         response.statusCode = 200;
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("Content-Type", "text/plain; charset=utf-8");
-        response.end(request.method === "HEAD" ? undefined : "ok");
+        response.end(request.method === "HEAD" ? undefined : "healthy");
         return;
       }
 
       if (requestUrl.pathname === "/ready") {
         response.setHeader("Cache-Control", "no-store");
-        response.setHeader("Content-Type", "text/plain; charset=utf-8");
+        response.setHeader("Content-Type", "application/json; charset=utf-8");
         try {
-          await (options?.checkReadiness ?? checkApplicationReadiness)();
+          const integrations = await (options?.checkReadiness ?? checkApplicationReadiness)();
           response.statusCode = 200;
-          response.end(request.method === "HEAD" ? undefined : "ready");
+          response.end(
+            request.method === "HEAD"
+              ? undefined
+              : JSON.stringify({ status: "healthy", details: integrations }),
+          );
         } catch (error) {
           logEvent("error", "readiness.failed", {
             requestId,
@@ -322,7 +327,17 @@ export function createHttpServer(options?: {
               : {}),
           });
           response.statusCode = 503;
-          response.end(request.method === "HEAD" ? undefined : "not ready");
+          response.end(
+            request.method === "HEAD"
+              ? undefined
+              : JSON.stringify({
+                  status: "unhealthy",
+                  details:
+                    error instanceof DependencyReadinessError
+                      ? error.integrations
+                      : undefined,
+                }),
+          );
         }
         return;
       }

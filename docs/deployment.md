@@ -13,11 +13,15 @@ reviewed migrations as a separate release step before shifting traffic.
 
 ## Production prerequisites
 
-Provision PostgreSQL with network access from the app and the `giemens_crm`
-schema, Upstash Redis for distributed rate limiting, a working SMTP relay, and
-a verified sender/recipient mailbox. Keep secrets in the platform's secret
-store; do not put production credentials in `.env`, a container image, or
-GitHub Actions logs.
+For CRM and authenticated server features, provision PostgreSQL with network
+access from the app and the `giemens_crm` schema. PostgreSQL is required to
+persist contact leads. SMTP, Upstash Redis, Azure Blob Storage, and ClamAV are
+optional integrations. Without SMTP, leads are still persisted but no contact
+notification email is sent. Without Redis, form APIs use a bounded,
+per-instance rate limiter; configure Redis for shared limits across serverless
+instances. Document workflows remain unavailable until Blob Storage and
+ClamAV are configured. Keep secrets in the platform's secret store; do not put
+production credentials in `.env`, a container image, or GitHub Actions logs.
 
 Set these variables in the platform:
 
@@ -25,16 +29,16 @@ Set these variables in the platform:
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL URL for the active Prisma schema and `giemens_crm` schema. |
 | `VITE_SITE_URL` | Public HTTPS origin; supplied as a Docker build argument to generate canonical metadata and sitemap URLs. |
-| `VITE_JURIVANA_URL` | Optional standalone Jurivana HTTPS origin, baked into the client build; defaults to `https://jurivana.giemens.com`. |
+| `VITE_JURIVANA_URL` | Standalone Jurivana HTTPS origin, baked into the client build; required for Vercel production. |
 | `AUTH_RATE_LIMIT_SECRET` | At least 32 bytes; used to hash login rate-limit keys. |
 | `METRICS_AUTH_TOKEN` | Optional private Prometheus scrape token; at least 32 bytes when set. |
-| `SMTP_PROVIDER` | `custom`, `microsoft365`, `google-workspace`, or `zoho`; defaults to `custom`. |
-| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` | SMTP relay connection/authentication. Host defaults are available for the named providers; use credentials approved by the provider. |
-| `SMTP_PORT` | Optional; defaults to `587`. Port `465` uses implicit TLS. |
-| `CONTACT_TO_EMAIL`, `CONTACT_FROM_EMAIL` | Real inbox and SMTP-authorized sender. |
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | HTTPS Upstash REST credentials for contact/lead rate limits. |
-| `AZURE_STORAGE_ACCOUNT_URL`, `AZURE_STORAGE_CONTAINER` | Private Blob account endpoint and container for document upload/download SAS URLs. The Azure template provisions the container and managed identity permissions. |
-| `CLAMAV_HOST`, `CLAMAV_PORT` | Private ClamAV daemon reachable by the application; TCP 3310 by default. Readiness fails closed if it cannot be reached. |
+| `SMTP_PROVIDER` | Optional; `custom`, `microsoft365`, `google-workspace`, or `zoho`; defaults to `custom`. |
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` | Optional SMTP relay connection/authentication. SMTP is disabled unless credentials and a usable host are configured. |
+| `SMTP_PORT` | Optional; defaults to `587` when SMTP is enabled. Port `465` uses implicit TLS. |
+| `CONTACT_TO_EMAIL`, `CONTACT_FROM_EMAIL` | Required contact addresses (personal addresses may be used temporarily); they do not send email unless SMTP is configured. |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Optional HTTPS Upstash REST credentials for contact/lead rate limits; both are needed to enable Redis. |
+| `AZURE_STORAGE_ACCOUNT_URL`, `AZURE_STORAGE_CONTAINER` | Optional private Blob account endpoint and container for document upload/download SAS URLs. Configure both to enable Blob Storage. |
+| `CLAMAV_HOST`, `CLAMAV_PORT` | Optional private ClamAV daemon; TCP 3310 by default. Scanning is disabled when the host is unset. |
 | `DOCUMENT_PENDING_RETENTION_HOURS`, `DOCUMENT_REJECTED_RETENTION_DAYS` | Cleanup policy for abandoned uploads and rejected quarantine objects; defaults are 24 hours and 30 days. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Optional OTLP/HTTP collector base URL. OTLP export is disabled when unset. |
 | `OTEL_EXPORTER_OTLP_HEADERS` | Optional collector authentication headers; keep in the platform secret store. |
@@ -125,9 +129,10 @@ access to the container port. The app trusts no proxy headers by default.
    credentials; do not use a superuser for the application.
 2. The upload API uses an Azure private Blob container, user-delegation SAS
    URLs, type/size/signature/checksum verification, and fail-closed ClamAV
-   scanning. Deploy a private ClamAV service reachable as `CLAMAV_HOST` before
-   routing traffic. Startup and `/ready` require PostgreSQL, SMTP, Azure Blob,
-   Upstash Redis and ClamAV to respond.
+   scanning. Configure Blob Storage and deploy a private ClamAV service
+   reachable as `CLAMAV_HOST` before enabling document uploads. Startup and
+   `/ready` require PostgreSQL and check each configured optional integration;
+   unconfigured SMTP, Blob Storage, Redis and ClamAV are reported as disabled.
 3. Configure an Azure Container Registry and build/push the image with the
    public `VITE_SITE_URL` and standalone `VITE_JURIVANA_URL` as build arguments.
 4. Create a Log Analytics workspace and prepare an untracked, ignored
