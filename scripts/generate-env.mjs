@@ -23,6 +23,7 @@ for (const target of targets) {
     `VITE_SITE_URL=${target.siteUrl}`,
     "VITE_JURIVANA_URL=https://jurivana.giemens.com",
     "VITE_CONTACT_ENDPOINT=/api/contact",
+    "ENABLE_LEAD_PERSISTENCE=false",
     `DATABASE_URL="postgresql://giemens_app:REPLACE_URL_ENCODED_PASSWORD@${target.databaseHost}:5432/giemens?schema=giemens_crm"`,
     "ADMIN_EMAIL=admin@giemens.local",
     "ADMIN_NAME=GIEMENS Local Admin",

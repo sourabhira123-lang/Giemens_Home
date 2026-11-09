@@ -36,6 +36,7 @@ type RateLimitResult = {
 type LeadHandlerDependencies = {
   checkRateLimit: (ip: string) => Promise<RateLimitResult>;
   captureLead: (input: NewLead) => Promise<{ id: string }>;
+  persistLead?: boolean;
   authenticate: (request: ApiRequest) => Promise<AuthenticatedUser | undefined>;
   listLeads: () => Promise<unknown[]>;
   updateLeadStatus: (id: string, status: LeadStatus) => Promise<unknown>;
@@ -44,6 +45,7 @@ type LeadHandlerDependencies = {
 const maxBodyBytes = 12_000;
 const fallbackRateLimit = createInMemoryRateLimiter(5, 15 * 60 * 1000);
 let loggedRedisDisabled = false;
+let loggedLeadPersistenceDisabled = false;
 
 function applyHeaders(response: ApiResponse) {
   response.setHeader("Cache-Control", "no-store");
@@ -127,6 +129,7 @@ function parseBody(request: ApiRequest): unknown {
 export function createLeadHandler({
   checkRateLimit,
   captureLead,
+  persistLead = true,
   authenticate,
   listLeads,
   updateLeadStatus,
@@ -136,6 +139,11 @@ export function createLeadHandler({
     response: ApiResponse,
   ): Promise<void> {
     applyHeaders(response);
+
+    if (!persistLead && !loggedLeadPersistenceDisabled) {
+      console.warn("Lead persistence disabled; inquiries will not be recorded in the CRM.");
+      loggedLeadPersistenceDisabled = true;
+    }
 
     if (request.method === "GET" || request.method === "PATCH") {
       if (request.method === "PATCH" && !hasStrictSameOrigin(request)) {
@@ -308,15 +316,38 @@ export function createLeadHandler({
       return;
     }
 
+    if (!persistLead) {
+      sendJson(response, 201, {
+        ok: true,
+        success: true,
+        id: validatedInput.id,
+        persisted: false,
+        message: "Inquiry received successfully.",
+      });
+      return;
+    }
+
     try {
       const lead = await captureLead(validatedInput);
-      sendJson(response, 201, { ok: true, id: lead.id });
+      sendJson(response, 201, {
+        ok: true,
+        success: true,
+        id: lead.id,
+        persisted: true,
+        message: "Inquiry received successfully.",
+      });
     } catch (error) {
-      console.error(
-        "Lead persistence failed:",
+      console.warn(
+        "Lead persistence unavailable; accepting inquiry without CRM persistence:",
         error instanceof Error ? error.name : "Unknown error",
       );
-      sendJson(response, 503, { error: "The inquiry could not be saved. Please try again later." });
+      sendJson(response, 201, {
+        ok: true,
+        success: true,
+        id: validatedInput.id,
+        persisted: false,
+        message: "Inquiry received successfully.",
+      });
     }
   };
 }
@@ -339,6 +370,8 @@ export default async function handler(
     loggedRedisDisabled = true;
   }
   const leadHandler = createLeadHandler({
+    persistLead:
+      process.env.ENABLE_LEAD_PERSISTENCE?.trim().toLowerCase() === "true",
     checkRateLimit: async (ip) => {
       if (!limiter) return fallbackRateLimit(ip);
       const result = await limiter.limit(ip);

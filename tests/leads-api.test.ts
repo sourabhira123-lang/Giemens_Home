@@ -67,9 +67,11 @@ function makeHandler(
     id: input.id,
   }),
   authenticatedUser?: AuthenticatedUser,
+  persistLead = true,
 ) {
   const captured: NewLead[] = [];
   const handler = createLeadHandler({
+    persistLead,
     checkRateLimit: async () => ({ success: true, reset: Date.now() + 60_000 }),
     captureLead: async (input) => {
       captured.push(input);
@@ -82,22 +84,71 @@ function makeHandler(
   return { handler, captured };
 }
 
-test("stores a validated lead and returns only its identifier", async () => {
+test("stores a validated lead and returns its persistence status", async () => {
   const { handler, captured } = makeHandler();
   const output = makeResponse();
   await handler(makeRequest(), output.response);
 
   assert.equal(output.response.statusCode, 201);
   assert.equal(output.body.ok, true);
+  assert.equal(output.body.success, true);
   assert.equal(output.body.id, validSubmission.id);
-  assert.deepEqual(Object.keys(output.body).sort(), ["id", "ok"]);
+  assert.equal(output.body.persisted, true);
+  assert.equal(output.body.message, "Inquiry received successfully.");
   assert.equal(captured[0].businessDivision, "Jurivana");
   assert.equal(captured[0].status, undefined);
   assert.equal(output.headers["cache-control"], "no-store");
 });
 
+test("accepts a validated inquiry without persistence when disabled", async () => {
+  const { handler, captured } = makeHandler(async () => {
+    throw new Error("Prisma should not run while persistence is disabled.");
+  }, undefined, false);
+  const output = makeResponse();
+  await handler(makeRequest(), output.response);
+
+  assert.equal(output.response.statusCode, 201);
+  assert.deepEqual(output.body, {
+    ok: true,
+    success: true,
+    id: validSubmission.id,
+    persisted: false,
+    message: "Inquiry received successfully.",
+  });
+  assert.equal(captured.length, 0);
+});
+
+test("continues accepting an inquiry if enabled lead persistence is unavailable", async () => {
+  const { handler } = makeHandler(async () => {
+    throw new Error("Prisma table does not exist.");
+  });
+  const output = makeResponse();
+  await handler(makeRequest(), output.response);
+
+  assert.equal(output.response.statusCode, 201);
+  assert.deepEqual(output.body, {
+    ok: true,
+    success: true,
+    id: validSubmission.id,
+    persisted: false,
+    message: "Inquiry received successfully.",
+  });
+});
+
 test("rejects invalid submissions before persistence", async () => {
   const { handler, captured } = makeHandler();
+  const output = makeResponse();
+  await handler(
+    makeRequest({ body: { ...validSubmission, email: "invalid" } }),
+    output.response,
+  );
+
+  assert.equal(output.response.statusCode, 400);
+  assert.equal(captured.length, 0);
+});
+
+test("preserves validation when persistence is disabled", async () => {
+  const { handler, captured } = makeHandler(undefined, undefined, false);
   const output = makeResponse();
   await handler(
     makeRequest({ body: { ...validSubmission, email: "invalid" } }),

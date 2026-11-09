@@ -59,6 +59,7 @@ Values in the browser must use the `VITE_` prefix; never put API keys in a
 | `VITE_JURIVANA_URL` | Required for Vercel production | HTTPS origin for the standalone Jurivana application. |
 | `VITE_CONTACT_ENDPOINT` | Optional | Same-origin contact API path; defaults to `/api/contact`. |
 | `DATABASE_URL` | Required for CRM and admin server runtime | PostgreSQL connection URL for the `giemens_crm` schema. |
+| `ENABLE_LEAD_PERSISTENCE` | Optional; defaults to `false` | Set to `true` to persist submitted leads to PostgreSQL. With persistence disabled or unavailable, valid inquiries are accepted but not recorded in the CRM. |
 | `AUTH_RATE_LIMIT_SECRET` | Required for authenticated server runtime | Random secret of at least 32 bytes for hashing login rate-limit keys. |
 | `SMTP_HOST` | Optional | SMTP relay hostname; custom providers need a host, named providers have defaults. |
 | `SMTP_PORT` | Optional | SMTP port; defaults to `587` and uses implicit TLS on port `465`. |
@@ -75,14 +76,20 @@ Values in the browser must use the `VITE_` prefix; never put API keys in a
 
 Missing optional integrations emit a warning and do not block a Vercel build.
 Readiness reports unconfigured SMTP, Redis, ClamAV, and Blob Storage as
-`disabled`. When SMTP is absent, lead submissions are still saved to
-PostgreSQL and the contact API explicitly reports that email notifications are
+`disabled`. Lead persistence is controlled by `ENABLE_LEAD_PERSISTENCE` and
+defaults to disabled. Valid inquiries are accepted without a CRM record while
+it is disabled; when enabled, leads are written to PostgreSQL. If a database
+write fails, the API logs a warning and still accepts the inquiry. Without
+SMTP, the contact API explicitly reports that email notifications are
 disabled; no email is sent. Without Redis, contact and lead APIs use a bounded,
 per-instance fallback rate limiter (five attempts per IP per 15 minutes); use
 Redis for shared rate limits across serverless instances. Document workflows
 that depend on Blob Storage or ClamAV remain unavailable until those
 integrations are configured. Keep credentials in the deployment platform's
 secret store and rotate them if exposed.
+
+Set `ENABLE_LEAD_PERSISTENCE=false` for the public website launch. Set it to
+`true` after the production CRM schema is ready.
 
 The project targets Node.js 22.x on Vercel. Its npm `allowScripts` policy
 approves the locked `esbuild` install script required to install esbuild's

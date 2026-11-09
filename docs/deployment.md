@@ -14,10 +14,12 @@ reviewed migrations as a separate release step before shifting traffic.
 ## Production prerequisites
 
 For CRM and authenticated server features, provision PostgreSQL with network
-access from the app and the `giemens_crm` schema. PostgreSQL is required to
-persist contact leads. SMTP, Upstash Redis, Azure Blob Storage, and ClamAV are
-optional integrations. Without SMTP, leads are still persisted but no contact
-notification email is sent. Without Redis, form APIs use a bounded,
+access from the app and the `giemens_crm` schema. Contact lead persistence is
+disabled by default and can be enabled with `ENABLE_LEAD_PERSISTENCE=true`.
+Valid inquiries are accepted if persistence is disabled or a database write
+fails. SMTP, Upstash Redis, Azure Blob Storage, and ClamAV are optional
+integrations. Without SMTP, no contact notification email is sent. Without
+Redis, form APIs use a bounded,
 per-instance rate limiter; configure Redis for shared limits across serverless
 instances. Document workflows remain unavailable until Blob Storage and
 ClamAV are configured. Keep secrets in the platform's secret store; do not put
@@ -28,6 +30,7 @@ Set these variables in the platform:
 | Variable | Notes |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL URL for the active Prisma schema and `giemens_crm` schema. |
+| `ENABLE_LEAD_PERSISTENCE` | Optional; defaults to `false`. Set to `true` to enable CRM lead persistence. If persistence is disabled or the database write fails, valid contact inquiries are accepted without a CRM record. |
 | `VITE_SITE_URL` | Public HTTPS origin; supplied as a Docker build argument to generate canonical metadata and sitemap URLs. |
 | `VITE_JURIVANA_URL` | Standalone Jurivana HTTPS origin, baked into the client build; required for Vercel production. |
 | `AUTH_RATE_LIMIT_SECRET` | At least 32 bytes; used to hash login rate-limit keys. |

@@ -44,6 +44,10 @@ CONTACT_TO_EMAIL
 TRUST_PROXY_HOPS
 ```
 
+`ENABLE_LEAD_PERSISTENCE` is optional and defaults to `false`. For the
+corporate website launch, leave it false to accept valid inquiries without CRM
+database writes. Set it to `true` after the production CRM schema is available.
+
 Configure these only when activating the associated integration:
 
 ```text

@@ -1000,7 +1000,7 @@ function ContactForm() {
       const leadResult: unknown = await leadResponse.json().catch(() => undefined);
       const leadBody =
         typeof leadResult === "object" && leadResult !== null
-          ? (leadResult as { ok?: unknown; error?: unknown })
+          ? (leadResult as { ok?: unknown; error?: unknown; persisted?: unknown })
           : undefined;
       if (leadResponse.status !== 201 || leadBody?.ok !== true) {
         setStatus("error");
@@ -1011,6 +1011,7 @@ function ContactForm() {
         );
         return;
       }
+      const leadPersisted = leadBody.persisted !== false;
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -1035,7 +1036,7 @@ function ContactForm() {
         });
         setStatus("error");
         setMessage(
-          "Your inquiry was saved, but could not be delivered. Please try again later.",
+          `Your inquiry was ${leadPersisted ? "saved" : "received"}, but could not be delivered. Please try again later.`,
         );
         return;
       }
@@ -1056,7 +1057,7 @@ function ContactForm() {
         setStatus("error");
         setMessage(
           (typeof responseBody?.error === "string" && responseBody.error
-            ? `${responseBody.error} Your inquiry is saved.`
+            ? `${responseBody.error} Your inquiry was ${leadPersisted ? "saved" : "received"}.`
             : undefined) ||
             "We could not submit your inquiry right now. Please try again later.",
         );
@@ -1068,9 +1069,13 @@ function ContactForm() {
       setBusinessDivision(getBusinessDivision(initialCategory, requestedDivision));
       setStatus("success");
       setMessage(
-        responseBody.notification === "disabled"
-          ? "Your inquiry has been saved. Email notifications are temporarily disabled."
-          : "Your inquiry has been submitted. Thank you for getting in touch.",
+        !leadPersisted
+          ? responseBody.notification === "disabled"
+            ? "Your inquiry has been received. CRM recording and email notifications are temporarily disabled."
+            : "Your inquiry has been received. CRM recording is temporarily disabled."
+          : responseBody.notification === "disabled"
+            ? "Your inquiry has been saved. Email notifications are temporarily disabled."
+            : "Your inquiry has been submitted. Thank you for getting in touch.",
       );
     } catch (error) {
       console.error("Contact form submission failed:", error);
