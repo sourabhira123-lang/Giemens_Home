@@ -8,7 +8,7 @@
       "maxDuration": 10
     },
     "api/leads.ts": {
-      "includeFiles": "src/features/leads/**/*.ts"
+      "includeFiles": "{server,src/features/leads}/**/*.ts"
     },
     "api/crm.ts": {
       "maxDuration": 15
