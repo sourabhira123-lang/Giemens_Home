@@ -917,9 +917,11 @@ export function ContactPage() {
             <span className="eyebrow">Get in touch</span>
             <h2>Every meaningful collaboration starts somewhere.</h2>
             <p>
-              Share your question or opportunity using the form. No office
-              address, phone number or email address has been supplied for
-              publication.
+             Share your question, opportunity, or business requirement using the form.
+             Our team will review your inquiry and respond to the email address provided Shortly.
+           </p>
+            <p>
+               Contact us at info@giemens.com for any inquiries.
             </p>
             <div className="contact-note">
               <Globe2 size={19} />
@@ -1068,15 +1070,9 @@ function ContactForm() {
       setCategory(initialCategory);
       setBusinessDivision(getBusinessDivision(initialCategory, requestedDivision));
       setStatus("success");
-      setMessage(
-        !leadPersisted
-          ? responseBody.notification === "disabled"
-            ? "Your inquiry has been received. CRM recording and email notifications are temporarily disabled."
-            : "Your inquiry has been received. CRM recording is temporarily disabled."
-          : responseBody.notification === "disabled"
-            ? "Your inquiry has been saved. Email notifications are temporarily disabled."
-            : "Your inquiry has been submitted. Thank you for getting in touch.",
-      );
+     setMessage(
+  "Thank you for contacting GIEMENS. Your inquiry has been received successfully and our team will review it shortly. A response will be sent to the email address provided."
+);
     } catch (error) {
       console.error("Contact form submission failed:", error);
       setStatus("error");
