@@ -155,15 +155,27 @@ test("sends a valid inquiry and returns success only after acceptance", async ()
   assert.equal(sent[0].email, validPayload.email);
 });
 
-test("returns an error when the email provider rejects the message", async () => {
+test("accepts an inquiry when the email provider rejects the message", async () => {
   const { handler, sent } = makeHandler({
     sendEmail: async () => false,
   });
   const output = makeResponse();
   await handler(makeRequest(), output.response);
-  assert.equal(output.response.statusCode, 502);
-  assert.equal(output.body.ok, undefined);
+  assert.equal(output.response.statusCode, 200);
+  assert.deepEqual(output.body, { ok: true });
   assert.equal(sent.length, 0);
+});
+
+test("accepts an inquiry when SMTP delivery throws", async () => {
+  const { handler } = makeHandler({
+    sendEmail: async () => {
+      throw new Error("SMTP unavailable");
+    },
+  });
+  const output = makeResponse();
+  await handler(makeRequest(), output.response);
+  assert.equal(output.response.statusCode, 200);
+  assert.deepEqual(output.body, { ok: true });
 });
 
 test("rate limits requests before attempting email delivery", async () => {

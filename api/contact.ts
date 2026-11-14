@@ -202,17 +202,17 @@ export function createContactHandler({
       const accepted = await sendEmail(result.value);
       if (!accepted) {
         recordEmailDelivery(process.env.SMTP_PROVIDER ?? "custom", "failure");
-        sendJson(response, 502, { error: "We could not submit your inquiry right now. Please try again later." });
-        return;
+        logEvent("error", "contact.email_delivery.failed", {
+          error: "ProviderRejected",
+        });
+      } else {
+        recordEmailDelivery(process.env.SMTP_PROVIDER ?? "custom", "success");
       }
-      recordEmailDelivery(process.env.SMTP_PROVIDER ?? "custom", "success");
     } catch (error) {
       recordEmailDelivery(process.env.SMTP_PROVIDER ?? "custom", "failure");
       logEvent("error", "contact.email_delivery.failed", {
         error: error instanceof Error ? error.name : "UnknownError",
       });
-      sendJson(response, 502, { error: "We could not submit your inquiry right now. Please try again later." });
-      return;
     }
 
     sendJson(response, 200, { ok: true });
