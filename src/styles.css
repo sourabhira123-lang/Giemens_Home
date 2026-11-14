@@ -509,7 +509,10 @@ h1, h2, h3, .brand-name strong { font-family: "Manrope", sans-serif; }
 .form-submit { min-width: 160px; }
 .form-status { min-height: 19px; margin: 11px 0 0; font-size: 11px; }
 .form-status-error { color: var(--deep-ocean); }
-.form-status-success { color: var(--corporate-blue); }
+.form-status-success { display: flex; align-items: flex-start; gap: 11px; min-height: 0; margin-top: 16px; padding: 14px; border: 1px solid rgba(39,112,69,.28); background: #edf6ef; color: #205b38; }
+.form-status-success svg { flex: 0 0 auto; margin-top: 1px; }
+.form-status-success strong { display: block; font-size: 13px; }
+.form-status-success p { margin: 4px 0 0; font-size: 12px; line-height: 1.55; }
 .spinner { width: 15px; height: 15px; border: 2px solid rgba(15,42,29,.25); border-top-color: var(--midnight-navy); border-radius: 50%; animation: spin .75s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

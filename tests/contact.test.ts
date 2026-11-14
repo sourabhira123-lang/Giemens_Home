@@ -1,11 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from "node:http";
-import contactFunction, { createContactHandler } from "../api/contact.ts";
+import contactFunction, {
+  createContactHandler,
+  isAutoReplyEnabled,
+} from "../api/contact.ts";
 import {
   validateContactPayload,
   type ContactInquiry,
 } from "../server/contact-validation.ts";
+import {
+  buildContactAutoReplyEmail,
+  buildContactNotificationEmail,
+} from "../server/email-templates.ts";
+import {
+  detectDialCodeFromTimezone,
+  getDefaultDialCode,
+} from "../src/utils/phoneCountryCode.ts";
 
 const validPayload = {
   fullName: "Example Sender",
@@ -65,6 +76,8 @@ function makeResponse() {
 function makeHandler(options: {
   allowed?: boolean;
   sendEmail?: (inquiry: ContactInquiry) => Promise<boolean>;
+  sendAutoReply?: (inquiry: ContactInquiry) => Promise<boolean>;
+  enableAutoReply?: boolean;
   checkRateLimit?: (ip: string) => Promise<{ success: boolean; reset: number }>;
 } = {}) {
   const sent: ContactInquiry[] = [];
@@ -81,6 +94,8 @@ function makeHandler(options: {
         sent.push(inquiry);
         return true;
       }),
+      ...(options.sendAutoReply ? { sendAutoReply: options.sendAutoReply } : {}),
+      enableAutoReply: options.enableAutoReply,
   });
   return { handler, sent };
 }
@@ -96,6 +111,57 @@ test("validates and normalizes contact inquiries", () => {
     assert.equal(result.value.fullName, "Example Sender");
     assert.equal(result.value.phone, "+14155552671");
   }
+});
+
+test("builds contact notification and customer acknowledgement templates", () => {
+  const inquiry: ContactInquiry = {
+    ...validPayload,
+    category: "General Inquiry",
+    source: "website_contact_form",
+  };
+  const submittedAt = new Date("2026-11-14T10:30:00.000Z");
+  const notification = buildContactNotificationEmail(inquiry, { submittedAt });
+  const autoReply = buildContactAutoReplyEmail(inquiry, submittedAt);
+
+  assert.equal(notification.subject, "[GIEMENS] New Contact Inquiry");
+  for (const detail of [
+    "Name: Example Sender",
+    "Email: sender@example.com",
+    "Phone: +14155552671",
+    "Organization: Example Organization",
+    "Category: General Inquiry",
+    "Subject: A question",
+    "I would like to learn more about your services.",
+    "Date: 2026-11-14T10:30:00.000Z",
+    "Source: website_contact_form",
+  ]) {
+    assert.ok(notification.text.includes(detail));
+  }
+  assert.equal(autoReply.subject, "Thank you for contacting GIEMENS");
+  assert.ok(autoReply.text.includes("Hello Example Sender,"));
+  assert.ok(autoReply.text.includes("Submitted: 2026-11-14T10:30:00.000Z"));
+  assert.ok(autoReply.text.includes("info@giemens.com"));
+  assert.ok(autoReply.text.includes("https://giemens.com"));
+});
+
+test("detects dial codes from timezone with an India fallback", () => {
+  assert.equal(detectDialCodeFromTimezone("Asia/Kolkata"), "+91");
+  assert.equal(detectDialCodeFromTimezone("Asia/Dubai"), "+971");
+  assert.equal(detectDialCodeFromTimezone("Asia/Singapore"), "+65");
+  assert.equal(detectDialCodeFromTimezone("Europe/London"), "+44");
+  assert.equal(detectDialCodeFromTimezone("America/New_York"), "+1");
+  assert.equal(detectDialCodeFromTimezone("America/Chicago"), "+1");
+  assert.equal(detectDialCodeFromTimezone("America/Los_Angeles"), "+1");
+  assert.equal(detectDialCodeFromTimezone("Australia/Sydney"), "+61");
+  assert.equal(detectDialCodeFromTimezone("Pacific/Honolulu"), undefined);
+  assert.equal(getDefaultDialCode("Pacific/Honolulu"), "+91");
+});
+
+test("keeps auto reply disabled by default and enables it only for true", () => {
+  assert.equal(isAutoReplyEnabled({}), false);
+  assert.equal(isAutoReplyEnabled({ ENABLE_AUTO_REPLY: "false" }), false);
+  assert.equal(isAutoReplyEnabled({ ENABLE_AUTO_REPLY: "true" }), true);
+  assert.equal(isAutoReplyEnabled({ ENABLE_AUTO_REPLY: "1" }), false);
 });
 
 test("contact API reports disabled notifications when SMTP and Redis are disabled", async () => {
@@ -178,6 +244,79 @@ test("accepts an inquiry when SMTP delivery throws", async () => {
   assert.deepEqual(output.body, { ok: true });
 });
 
+test("attempts auto reply only after notification when enabled", async () => {
+  const attempts: string[] = [];
+  const { handler } = makeHandler({
+    enableAutoReply: true,
+    sendEmail: async () => {
+      attempts.push("notification");
+      return true;
+    },
+    sendAutoReply: async () => {
+      attempts.push("auto-reply");
+      return true;
+    },
+  });
+  const output = makeResponse();
+  await handler(makeRequest(), output.response);
+  assert.equal(output.response.statusCode, 200);
+  assert.deepEqual(attempts, ["notification", "auto-reply"]);
+});
+
+test("does not attempt auto reply when disabled or notification fails", async () => {
+  let autoReplyAttempted = false;
+  const disabled = makeHandler({
+    enableAutoReply: false,
+    sendAutoReply: async () => {
+      autoReplyAttempted = true;
+      return true;
+    },
+  });
+  const disabledResponse = makeResponse();
+  await disabled.handler(makeRequest(), disabledResponse.response);
+  assert.equal(autoReplyAttempted, false);
+
+  const rejected = makeHandler({
+    enableAutoReply: true,
+    sendEmail: async () => false,
+    sendAutoReply: async () => {
+      autoReplyAttempted = true;
+      return true;
+    },
+  });
+  const rejectedResponse = makeResponse();
+  await rejected.handler(makeRequest(), rejectedResponse.response);
+  assert.equal(rejectedResponse.response.statusCode, 200);
+  assert.equal(autoReplyAttempted, false);
+
+  const unavailableMailer = createContactHandler({
+    checkRateLimit: async () => ({ success: true, reset: Date.now() + 60_000 }),
+    enableAutoReply: true,
+    sendAutoReply: async () => {
+      autoReplyAttempted = true;
+      return true;
+    },
+  });
+  const unavailableResponse = makeResponse();
+  await unavailableMailer(makeRequest(), unavailableResponse.response);
+  assert.equal(unavailableResponse.response.statusCode, 200);
+  assert.deepEqual(unavailableResponse.body, { notification: "disabled" });
+  assert.equal(autoReplyAttempted, false);
+});
+
+test("auto reply failure logs without failing the contact submission", async () => {
+  const { handler } = makeHandler({
+    enableAutoReply: true,
+    sendAutoReply: async () => {
+      throw new Error("mail transport unavailable");
+    },
+  });
+  const output = makeResponse();
+  await handler(makeRequest(), output.response);
+  assert.equal(output.response.statusCode, 200);
+  assert.deepEqual(output.body, { ok: true });
+});
+
 test("rate limits requests before attempting email delivery", async () => {
   let emailAttempted = false;
   const { handler } = makeHandler({
@@ -192,6 +331,38 @@ test("rate limits requests before attempting email delivery", async () => {
   assert.equal(output.response.statusCode, 429);
   assert.equal(output.headers["retry-after"], "30");
   assert.equal(emailAttempted, false);
+});
+
+test("uses the Cloudflare client IP and rate limits requests with an unknown IP", async () => {
+  const checkedIps: string[] = [];
+  const { handler } = makeHandler({
+    checkRateLimit: async (ip) => {
+      checkedIps.push(ip);
+      return { success: true, reset: Date.now() + 60_000 };
+    },
+  });
+  const cloudflareResponse = makeResponse();
+  const cloudflareRequest = makeRequest({
+    headers: {
+      host: "example.test",
+      origin: "https://example.test",
+      "content-type": "application/json",
+      "cf-connecting-ip": "198.51.100.20",
+    },
+  });
+  delete cloudflareRequest.ip;
+  await handler(
+    cloudflareRequest,
+    cloudflareResponse.response,
+  );
+
+  const unknownRequest = makeRequest();
+  delete unknownRequest.ip;
+  const unknownResponse = makeResponse();
+  await handler(unknownRequest, unknownResponse.response);
+
+  assert.deepEqual(checkedIps, ["198.51.100.20", "unknown"]);
+  assert.equal(unknownResponse.response.statusCode, 200);
 });
 
 test("rejects honeypot submissions without delivering email", async () => {

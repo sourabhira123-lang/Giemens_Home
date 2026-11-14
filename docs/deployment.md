@@ -24,6 +24,9 @@ per-instance rate limiter; configure Redis for shared limits across serverless
 instances. Document workflows remain unavailable until Blob Storage and
 ClamAV are configured. Keep secrets in the platform's secret store; do not put
 production credentials in `.env`, a container image, or GitHub Actions logs.
+Customer auto replies are opt-in with `ENABLE_AUTO_REPLY=true` and are attempted
+only after a notification is accepted by the configured SMTP relay. The flag
+defaults to `false`; without SMTP, contact submissions continue without email.
 
 Set these variables in the platform:
 
@@ -39,6 +42,7 @@ Set these variables in the platform:
 | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` | Optional SMTP relay connection/authentication. SMTP is disabled unless credentials and a usable host are configured. |
 | `SMTP_PORT` | Optional; defaults to `587` when SMTP is enabled. Port `465` uses implicit TLS. |
 | `CONTACT_TO_EMAIL`, `CONTACT_FROM_EMAIL` | Required contact addresses (personal addresses may be used temporarily); they do not send email unless SMTP is configured. |
+| `ENABLE_AUTO_REPLY` | Optional; defaults to `false`. Set to `true` to send a customer acknowledgement after the internal SMTP notification succeeds. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Optional HTTPS Upstash REST credentials for contact/lead rate limits; both are needed to enable Redis. |
 | `AZURE_STORAGE_ACCOUNT_URL`, `AZURE_STORAGE_CONTAINER` | Optional private Blob account endpoint and container for document upload/download SAS URLs. Configure both to enable Blob Storage. |
 | `CLAMAV_HOST`, `CLAMAV_PORT` | Optional private ClamAV daemon; TCP 3310 by default. Scanning is disabled when the host is unset. |

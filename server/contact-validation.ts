@@ -18,6 +18,7 @@ export type ContactInquiry = {
   category: (typeof inquiryCategories)[number];
   subject: string;
   message: string;
+  source?: string;
 };
 
 export type ContactValidationResult =
@@ -72,6 +73,7 @@ export function validateContactPayload(
   const category = readText(input, "category", 80, true);
   const subject = readText(input, "subject", 180, true);
   const message = readText(input, "message", 5000, true);
+  const source = readText(input, "source", 100);
   const website = input.website;
 
   if (
@@ -92,6 +94,7 @@ export function validateContactPayload(
     subject === null ||
     message === undefined ||
     message === null ||
+    source === null ||
     message.length < 10 ||
     (website !== undefined && typeof website !== "string")
   ) {
@@ -116,6 +119,7 @@ export function validateContactPayload(
       category: category as ContactInquiry["category"],
       subject,
       message,
+      ...(source ? { source } : {}),
     },
     honeypotFilled: typeof website === "string" && website.trim().length > 0,
   };

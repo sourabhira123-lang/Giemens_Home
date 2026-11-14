@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Check,
+  CheckCircle2,
   Globe2,
   Layers3,
   Network,
@@ -12,7 +13,7 @@ import {
   Target,
   Workflow,
 } from "lucide-react";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   businessAreas,
@@ -35,6 +36,7 @@ import {
   getCategoryForDivision,
   resolveBusinessDivision,
 } from "./features/leads/leadManagement";
+import { getDefaultDialCode } from "./utils/phoneCountryCode";
 
 const architectureImage =
   "https://images.unsplash.com/photo-1487958449943-2429e8be8625?auto=format&fit=crop&w=1500&q=85";
@@ -949,7 +951,21 @@ function ContactForm() {
   const [businessDivision, setBusinessDivision] = useState(
     getBusinessDivision(initialCategory, requestedDivision),
   );
+  const [phonePlaceholder, setPhonePlaceholder] = useState("+91 98765 43210");
   const submissionId = useRef<string | null>(null);
+
+  useEffect(() => {
+    const examples: Record<string, string> = {
+      "+1": "+1 555 123 4567",
+      "+44": "+44 7700 900123",
+      "+61": "+61 412 345 678",
+      "+65": "+65 8123 4567",
+      "+91": "+91 98765 43210",
+      "+971": "+971 50 123 4567",
+    };
+    const dialCode = getDefaultDialCode();
+    setPhonePlaceholder(examples[dialCode] ?? `${dialCode} 123 456 789`);
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1027,6 +1043,7 @@ function ContactForm() {
           subject: data.get("subject"),
           message: data.get("message"),
           website: data.get("website"),
+          source: inquirySource,
         }),
       });
       const contentType = response.headers.get("content-type") ?? "";
@@ -1070,9 +1087,6 @@ function ContactForm() {
       setCategory(initialCategory);
       setBusinessDivision(getBusinessDivision(initialCategory, requestedDivision));
       setStatus("success");
-     setMessage(
-  "Thank you for contacting GIEMENS. Your inquiry has been received successfully and our team will review it shortly. A response will be sent to the email address provided."
-);
     } catch (error) {
       console.error("Contact form submission failed:", error);
       setStatus("error");
@@ -1093,7 +1107,7 @@ function ContactForm() {
         </label>
         <label>
           Phone number
-          <input type="tel" name="phone" autoComplete="tel" placeholder="+91 98765 43210" maxLength={24} />
+          <input type="tel" name="phone" autoComplete="tel" placeholder={phonePlaceholder} maxLength={24} />
         </label>
         <label>
           Company / organization
@@ -1147,9 +1161,19 @@ function ContactForm() {
         {status === "loading" ? "Submitting…" : "Send inquiry"}
         {status === "loading" ? <span className="spinner" aria-hidden="true" /> : <ArrowRight size={17} />}
       </button>
-      <p className={`form-status form-status-${status}`} role="status" aria-live="polite">
-        {message}
-      </p>
+      {status === "success" ? (
+        <div className="form-status form-status-success" role="status" aria-live="polite">
+          <CheckCircle2 size={21} aria-hidden="true" />
+          <div>
+            <strong>Inquiry Sent Successfully</strong>
+            <p>Thank you for contacting GIEMENS. Your inquiry has been received successfully and our team will review it shortly.</p>
+          </div>
+        </div>
+      ) : (
+        <p className={`form-status form-status-${status}`} role="status" aria-live="polite">
+          {message}
+        </p>
+      )}
     </form>
   );
 }

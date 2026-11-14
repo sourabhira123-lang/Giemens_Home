@@ -12,6 +12,10 @@ import {
   EmailService,
   resolveSmtpSettings,
 } from "../server/email-service.ts";
+import {
+  buildContactAutoReplyEmail,
+  buildContactNotificationEmail,
+} from "../server/email-templates.ts";
 import { createInMemoryRateLimiter } from "../server/in-memory-rate-limit.ts";
 import { logEvent, recordEmailDelivery } from "../server/observability.ts";
 
@@ -32,6 +36,8 @@ type RateLimitResult = {
 type ContactHandlerDependencies = {
   checkRateLimit: (ip: string) => Promise<RateLimitResult>;
   sendEmail?: (inquiry: ContactInquiry) => Promise<boolean>;
+  sendAutoReply?: (inquiry: ContactInquiry) => Promise<boolean>;
+  enableAutoReply?: boolean;
 };
 
 const maxBodyBytes = 12_000;
@@ -66,10 +72,13 @@ function requestIp(request: ApiRequest): string | undefined {
     return request.ip;
   }
   const forwarded = request.headers["x-vercel-forwarded-for"];
+  const cloudflare = request.headers["cf-connecting-ip"];
   const fallback = request.headers["x-forwarded-for"];
   const header = Array.isArray(forwarded)
     ? forwarded[0]
-    : forwarded ?? (Array.isArray(fallback) ? fallback[0] : fallback);
+    : forwarded ?? (Array.isArray(cloudflare)
+      ? cloudflare[0]
+      : cloudflare ?? (Array.isArray(fallback) ? fallback[0] : fallback));
   const candidate = header?.split(",")[0]?.trim();
   return candidate && isIP(candidate) ? candidate : undefined;
 }
@@ -124,6 +133,8 @@ function parseBody(request: ApiRequest): unknown {
 export function createContactHandler({
   checkRateLimit,
   sendEmail,
+  sendAutoReply,
+  enableAutoReply = false,
 }: ContactHandlerDependencies) {
   return async function contactHandler(
     request: ApiRequest,
@@ -155,11 +166,7 @@ export function createContactHandler({
       return;
     }
 
-    const ip = requestIp(request);
-    if (!ip) {
-      sendJson(response, 503, { error: "The contact service is temporarily unavailable." });
-      return;
-    }
+    const ip = requestIp(request) ?? "unknown";
 
     let limit: RateLimitResult;
     try {
@@ -207,6 +214,20 @@ export function createContactHandler({
         });
       } else {
         recordEmailDelivery(process.env.SMTP_PROVIDER ?? "custom", "success");
+        if (enableAutoReply && sendAutoReply) {
+          try {
+            const autoReplyAccepted = await sendAutoReply(result.value);
+            if (!autoReplyAccepted) {
+              logEvent("warn", "contact.auto_reply.failed", {
+                error: "ProviderRejected",
+              });
+            }
+          } catch (error) {
+            logEvent("warn", "contact.auto_reply.failed", {
+              error: error instanceof Error ? error.name : "UnknownError",
+            });
+          }
+        }
       }
     } catch (error) {
       recordEmailDelivery(process.env.SMTP_PROVIDER ?? "custom", "failure");
@@ -278,6 +299,7 @@ function readRuntimeConfig(env: NodeJS.ProcessEnv) {
   return {
     ok: true as const,
     smtpEnabled,
+    enableAutoReply: isAutoReplyEnabled(env),
     recipient,
     sender,
     redisEnabled,
@@ -318,6 +340,7 @@ export default async function handler(
   }
 
   const contactHandler = createContactHandler({
+    enableAutoReply: config.enableAutoReply,
     checkRateLimit: async (ip) => {
       if (!limiter) return fallbackRateLimit(ip);
       const result = await limiter.limit(ip);
@@ -326,27 +349,36 @@ export default async function handler(
     ...(emailService
       ? {
           sendEmail: async (inquiry: ContactInquiry) => {
+            const email = buildContactNotificationEmail(inquiry);
             await emailService.send({
               from: config.sender,
               to: config.recipient,
               replyTo: inquiry.email,
-              subject: `[GIEMENS] ${inquiry.subject}`,
-              text: [
-                `Name: ${inquiry.fullName}`,
-                `Email: ${inquiry.email}`,
-                `Phone: ${inquiry.phone ?? "Not provided"}`,
-                `Organization: ${inquiry.organization ?? "Not provided"}`,
-                `Category: ${inquiry.category}`,
-                "",
-                "Message:",
-                inquiry.message,
-              ].join("\n"),
+              ...email,
             });
             return true;
           },
+          ...(config.enableAutoReply
+            ? {
+                sendAutoReply: async (inquiry: ContactInquiry) => {
+                  const email = buildContactAutoReplyEmail(inquiry);
+                  await emailService.send({
+                    from: config.sender,
+                    to: inquiry.email,
+                    replyTo: config.recipient,
+                    ...email,
+                  });
+                  return true;
+                },
+              }
+            : {}),
         }
       : {}),
   });
 
   await contactHandler(request, response);
+}
+
+export function isAutoReplyEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.ENABLE_AUTO_REPLY?.trim().toLowerCase() === "true";
 }
